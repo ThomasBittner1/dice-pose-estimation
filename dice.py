@@ -138,7 +138,6 @@ def main(config: AppConfig | None = None):
 
             similarity_score = geometry_utils.get_similarity_score(points, prev_points)
             tracking_state = stability_tracker.update(similarity_score)
-            print (similarity_score)
             prev_points = points.copy()
 
             if debug_mode:
@@ -322,7 +321,7 @@ def main(config: AppConfig | None = None):
                     # contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     num_dots = 0
                     blurred_mask = cv2.GaussianBlur(mask, (9, 9), 2)
-                    blurred_mask_preview = blurred_mask
+                    blurred_mask_preview = cv2.cvtColor(blurred_mask, cv2.COLOR_GRAY2BGR)
                     min_radius = max(3, top_size // 16)
                     max_radius = max(min_radius + 1, top_size // 6)
                     circles = cv2.HoughCircles(
@@ -336,14 +335,13 @@ def main(config: AppConfig | None = None):
                         maxRadius=max_radius,
                     )
 
-                    # print the radien of all circles found
                     if circles is not None:
                         rounded_circles = np.round(circles[0]).astype(int)
                         num_dots = len(rounded_circles)
                         if debug_mode:
                             for circle_x, circle_y, circle_radius in rounded_circles:
-                                cv2.circle(top_face_warp, (circle_x, circle_y), circle_radius, (0, 255, 255), 2)
-                                cv2.circle(top_face_warp, (circle_x, circle_y), 2, (255, 0, 255), -1)
+                                cv2.circle(blurred_mask_preview, (circle_x, circle_y), circle_radius, (0, 255, 255), 2)
+                                cv2.circle(blurred_mask_preview, (circle_x, circle_y), 2, (255, 0, 255), -1)
                     label_x = min(point[0] for point in top_face_points)
                     label_y = max(20, min(point[1] for point in top_face_points) - 12)
                     drawing.draw_count_sphere(preview, num_dots, (label_x, label_y))

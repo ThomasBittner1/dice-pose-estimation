@@ -14,10 +14,10 @@ from tracking_state import StabilityTracker
 class AppConfig:
     video_source: str | int = "green_cube_2.mp4"
     playback_delay_ms: int = 20
-    start_frame: int = 0
+    start_frame: int = 600
     start_paused: bool = True
     debug_mode: bool = False
-    stable_similarity_threshold: float = 0.8
+    stable_similarity_threshold: float = 0.85
     dice_hsv_min: tuple[int, int, int] = (26, 59, 30)
     dice_hsv_max: tuple[int, int, int] = (98, 255, 250)
     top_face_green_hsv_min: tuple[int, int, int] = (62, 37, 92)
@@ -334,7 +334,7 @@ def main(config: AppConfig | None = None):
                     circles = cv2.HoughCircles(
                         blurred_mask,
                         cv2.HOUGH_GRADIENT,
-                        dp=1.2,
+                        dp=1.2, # tested 1.5 and recognizes more (true and false ones though)
                         minDist=max(10, top_size // 5),
                         param1=120,
                         param2=20,

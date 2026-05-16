@@ -1,7 +1,6 @@
-import json
 import sys
+from dataclasses import dataclass
 from functools import partial
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -10,42 +9,19 @@ from PySide6 import QtGui
 from PySide6 import QtWidgets
 
 COLOR_NAME = "green"
-DEFAULT_MIN_VALS = (26, 59, 30)
-DEFAULT_MAX_VALS = (98, 255, 250)
+DEFAULT_MIN_VALS = (61, 42, 100)
+DEFAULT_MAX_VALS = (81, 255, 248)
 DISPLAY_COLOR = (0, 255, 0)
 
-CONFIG_PATH = Path("hsv_config.json")
+
+@dataclass
+class AppConfig:
+    video_source: str | int = "green_cube_2.mp4"
+    start_frame: int = 6
+    start_paused: bool = True
 
 
-def _is_valid_hsv_triplet(values):
-    if not isinstance(values, (list, tuple)) or len(values) != 3:
-        return False
-    return (
-        isinstance(values[0], int) and 0 <= values[0] <= 179
-        and isinstance(values[1], int) and 0 <= values[1] <= 255
-        and isinstance(values[2], int) and 0 <= values[2] <= 255
-    )
-
-
-def save_config(config):
-    with CONFIG_PATH.open("w", encoding="utf-8") as file:
-        json.dump(config, file, indent=2)
-
-
-def get_config():
-    if CONFIG_PATH.exists():
-        try:
-            with CONFIG_PATH.open("r", encoding="utf-8") as file:
-                config = json.load(file)
-            saved_color = config.get(COLOR_NAME, {}) if isinstance(config, dict) else {}
-            min_vals = saved_color.get("min_vals")
-            max_vals = saved_color.get("max_vals")
-            invert = bool(saved_color.get("invert", False))
-            if _is_valid_hsv_triplet(min_vals) and _is_valid_hsv_triplet(max_vals):
-                return {COLOR_NAME: {"min_vals": tuple(min_vals), "max_vals": tuple(max_vals), "invert": invert}}
-        except (json.JSONDecodeError, OSError):
-            pass
-
+def get_default_config():
     return {
         COLOR_NAME: {
             "min_vals": DEFAULT_MIN_VALS,
@@ -167,7 +143,7 @@ class VideoLabel(QtWidgets.QLabel):
 
 
 class HSVControlsDialog(QtWidgets.QDialog):
-    def __init__(self, config):
+    def __init__(self, color_config, app_config):
         super().__init__()
         self.setWindowTitle("HSV Controls")
         self.resize(1500, 700)
@@ -190,7 +166,7 @@ class HSVControlsDialog(QtWidgets.QDialog):
 
         self.play_button = QtWidgets.QPushButton("Play")
         self.play_button.setCheckable(True)
-        self.play_button.setChecked(True)
+        self.play_button.setChecked(not app_config.start_paused)
         controls_layout.addWidget(self.play_button)
 
         self.hover_hsv_label = QtWidgets.QLabel("Hover HSV: -")
@@ -212,7 +188,7 @@ class HSVControlsDialog(QtWidgets.QDialog):
         root_layout.addWidget(scroll_area, stretch=0)
         root_layout.addWidget(self.video_label, stretch=1)
 
-        for color_name, color_data in config.items():
+        for color_name, color_data in color_config.items():
             group = QtWidgets.QGroupBox(color_name)
             group_layout = QtWidgets.QFormLayout(group)
 
@@ -436,17 +412,23 @@ class HSVControlsDialog(QtWidgets.QDialog):
         return config
 
     def save_values(self):
-        save_config(self.get_values())
+        pass
 
-def main():
+def main(config: AppConfig | None = None):
+    if config is None:
+        config = AppConfig()
+
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
-    cap = cv2.VideoCapture('green_cube_2.mp4')
+    cap = cv2.VideoCapture(config.video_source)
     if not cap.isOpened():
-        print("Error: Could not open webcam.")
+        print(f"Error: Could not open video source {config.video_source}.")
         return
 
-    controls_dialog = HSVControlsDialog(get_config())
+    if config.start_frame > 0:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame)
+
+    controls_dialog = HSVControlsDialog(get_default_config(), config)
     controls_dialog.show()
 
     kernel = np.ones((5, 5), np.uint8)
@@ -525,10 +507,8 @@ def main():
     app.exec()
 
     final_values = controls_dialog.get_values()[COLOR_NAME]
-    save_config({COLOR_NAME: final_values})
-    print(f"mask = cv2.inRange(hsv, np.array({list(final_values['min_vals'])}, dtype=np.uint8), np.array({list(final_values['max_vals'])}, dtype=np.uint8))")
-    if final_values.get("invert", False):
-        print("mask = cv2.bitwise_not(mask)")
+    print(f"min: tuple[int, int, int] = {tuple(final_values['min_vals'])}")
+    print(f"max: tuple[int, int, int] = {tuple(final_values['max_vals'])}")
 
     timer.stop()
     cap.release()

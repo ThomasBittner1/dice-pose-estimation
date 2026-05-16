@@ -22,6 +22,10 @@ class AppConfig:
     debug_mode: bool = False
     stable_similarity_threshold: float = 0.95
     stable_required_frames: int = 5
+    dice_hsv_min: tuple[int, int, int] = (26, 59, 30)
+    dice_hsv_max: tuple[int, int, int] = (98, 255, 250)
+    top_face_green_hsv_min: tuple[int, int, int] = (62, 37, 92)
+    top_face_green_hsv_max: tuple[int, int, int] = (89, 255, 249)
 
 
 def close_debug_windows():
@@ -105,7 +109,11 @@ def main(config: AppConfig | None = None):
             cv2.putText(preview, frame_text, (text_x, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
 
         hsv = cv2.cvtColor(preview, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, np.array([26, 59, 30], dtype=np.uint8), np.array([98, 255, 250], dtype=np.uint8))
+        mask = cv2.inRange(
+            hsv,
+            np.array(config.dice_hsv_min, dtype=np.uint8),
+            np.array(config.dice_hsv_max, dtype=np.uint8),
+        )
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
@@ -304,7 +312,11 @@ def main(config: AppConfig | None = None):
                     top_face_warp = cv2.warpPerspective(frame, homography, (top_size, top_size))
 
                     hsv = cv2.cvtColor(top_face_warp, cv2.COLOR_BGR2HSV)
-                    green_range = cv2.inRange(hsv, np.array([61, 42, 100], dtype=np.uint8), np.array([81, 255, 248], dtype=np.uint8))
+                    green_range = cv2.inRange(
+                        hsv,
+                        np.array(config.top_face_green_hsv_min, dtype=np.uint8),
+                        np.array(config.top_face_green_hsv_max, dtype=np.uint8),
+                    )
                     mask = cv2.bitwise_not(green_range)
                     num_dots = 0
                     blurred_mask = cv2.GaussianBlur(mask, (9, 9), 2)

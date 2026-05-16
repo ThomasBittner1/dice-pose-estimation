@@ -17,12 +17,54 @@ class AppConfig:
     start_frame = 6 # 218 #217 # 544 # 156 # 288 # 14
     start_paused = True
     run_while_on_pause = False
+    debug_mode = False
+
+
+def draw_count_sphere(image, count, text_origin):
+    text = str(count)
+    font_face = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 1.1
+    thickness = 3
+    text_size, baseline = cv2.getTextSize(text, font_face, font_scale, thickness)
+    text_width, text_height = text_size
+    center = (text_origin[0] + text_width // 2, text_origin[1] - text_height // 2)
+    radius = max(24, max(text_width, text_height + baseline) // 2 + 14)
+
+    center = (
+        min(max(radius + 4, center[0]), image.shape[1] - radius - 4),
+        min(max(radius + 4, center[1]), image.shape[0] - radius - 4),
+    )
+    text_origin = (center[0] - text_width // 2, center[1] + text_height // 2)
+
+    overlay = image.copy()
+    for current_radius in range(radius, 0, -1):
+        ratio = current_radius / radius
+        color = (
+            int(45 + 40 * (1 - ratio)),
+            int(135 + 80 * (1 - ratio)),
+            int(235 + 20 * (1 - ratio)),
+        )
+        cv2.circle(overlay, center, current_radius, color, -1, cv2.LINE_AA)
+
+    cv2.addWeighted(overlay, 0.82, image, 0.18, 0, image)
+    cv2.circle(image, center, radius, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(image, text, text_origin, font_face, font_scale, (20, 20, 20), thickness + 2, cv2.LINE_AA)
+    cv2.putText(image, text, text_origin, font_face, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+
+
+def close_debug_windows():
+    for window_name in ("cropped_extracted_by_mask", "Dice Edges", "Dice Top Face", "Dice Blurred Mask"):
+        try:
+            cv2.destroyWindow(window_name)
+        except cv2.error:
+            pass
 
 
 def main(config: AppConfig | None = None):
     if config is None:
         config = AppConfig()
 
+    debug_mode = config.debug_mode
     cap = cv2.VideoCapture('green_cube_2.mp4')
     if not cap.isOpened():
         print(f"Error: Could not open camera {config.camera_index}.")
@@ -33,16 +75,22 @@ def main(config: AppConfig | None = None):
 
     paused = config.start_paused
     paused_frame = None
+    redraw_paused_frame = False
     frame_number = config.start_frame - 1
 
     while True:
-        if paused and paused_frame is not None and not config.run_while_on_pause:
+        if paused and paused_frame is not None and not config.run_while_on_pause and not redraw_paused_frame:
             key = cv2.waitKeyEx(config.playback_delay_ms)
             if key in (ord("q"), ord("Q")):
                 break
             if key == ord(" "):
                 paused = False
                 paused_frame = None
+            elif key in (ord("d"), ord("D")):
+                debug_mode = not debug_mode
+                if not debug_mode:
+                    close_debug_windows()
+                redraw_paused_frame = True
             elif key == config.left_arrow_key:
                 target_frame = max(config.start_frame, frame_number - 1)
                 cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
@@ -62,6 +110,7 @@ def main(config: AppConfig | None = None):
                 frame_number += 1
                 paused_frame = frame.copy()
             frame = paused_frame.copy()
+            redraw_paused_frame = False
         else:
             ret, frame = cap.read()
             if not ret:
@@ -73,10 +122,11 @@ def main(config: AppConfig | None = None):
         preview = frame.copy()
         top_face_warp = None
         blurred_mask_preview = None
-        frame_text = f"frame: {frame_number}"
-        text_size, _ = cv2.getTextSize(frame_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
-        text_x = preview.shape[1] - text_size[0] - 20
-        cv2.putText(preview, frame_text, (text_x, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
+        if debug_mode:
+            frame_text = f"frame: {frame_number}"
+            text_size, _ = cv2.getTextSize(frame_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
+            text_x = preview.shape[1] - text_size[0] - 20
+            cv2.putText(preview, frame_text, (text_x, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
 
 
         # extract green color
@@ -91,7 +141,8 @@ def main(config: AppConfig | None = None):
             outer_contour_rect = cv2.boundingRect(outer_contour)
             outer_contour_x, outer_contour_y, outer_contour_w, outer_contour_h = outer_contour_rect
 
-            cv2.drawContours(preview, [outer_contour], -1, (255, 255, 255), 1)
+            if debug_mode:
+                cv2.drawContours(preview, [outer_contour], -1, (255, 255, 255), 1)
             # for contour_point in outer_contour.reshape(-1, 2):
             #     cv2.circle(preview, tuple(contour_point), 4, (255, 255, 0), -1)
 
@@ -102,16 +153,17 @@ def main(config: AppConfig | None = None):
 
             # drawing the points that where found from approximate_contour_corners
             #
-            for p, point in enumerate(points):
-                cv2.circle(preview, point, 5, (0, 0, 255), -1)
-                cv2.line(preview, point, points[p + 1 if p < len(points) - 1 else 0], (0, 255, 0), 3)
-                cv2.putText(preview, str(p), point, cv2.FONT_HERSHEY_SIMPLEX, 1.45, (0, 255, 0), 2, cv2.LINE_AA)
+            if debug_mode:
+                for p, point in enumerate(points):
+                    cv2.circle(preview, point, 5, (0, 0, 255), -1)
+                    cv2.line(preview, point, points[p + 1 if p < len(points) - 1 else 0], (0, 255, 0), 3)
+                    cv2.putText(preview, str(p), point, cv2.FONT_HERSHEY_SIMPLEX, 1.45, (0, 255, 0), 2, cv2.LINE_AA)
 
             if len(points) == 4: # [[0, 2], [1, 3]]
                 # hough_lines = hough_lines.squeeze()
 
                 if len(parallels) == 2 and len(parallels[0]) == 2 and len(parallels[1]) == 2:
-                    hough_lines, hough_lines_lengths, hough_directions = detect_hough_lines_in_contour_roi(frame, mask, outer_contour_rect, do_imshow=True)
+                    hough_lines, hough_lines_lengths, hough_directions = detect_hough_lines_in_contour_roi(frame, mask, outer_contour_rect, do_imshow=debug_mode)
 
                     ratio = 0.5
                     if hough_lines is not None:
@@ -144,7 +196,8 @@ def main(config: AppConfig | None = None):
 
             elif len(points) == 5:
                 if len([x for x in parallels if len(x) == 1]) == 2:
-                    print ('invalid', frame_number + 1)
+                    if debug_mode:
+                        print ('invalid', frame_number + 1)
                 else:
                     if len(parallels) == 2: # parallels == [[0, 3], [1, 2, 4]]; [[0, 2, 3], [1, 4]]
                         bigger_index = np.argmax([len(x) for x in parallels]) # 1 - smaller_one
@@ -177,7 +230,7 @@ def main(config: AppConfig | None = None):
 
             # drawing the points that got fixed
             #
-            if True:
+            if debug_mode:
                 for p, point in enumerate(points):
                     cv2.circle(preview, point, 5, (0, 0, 255), -1)
                     cv2.line(preview, point, points[p + 1 if p < len(points) - 1 else 0], (0, 0, 255), 2)
@@ -187,7 +240,7 @@ def main(config: AppConfig | None = None):
                 highest_two = np.argsort(points[:, 1])[:2]
                 cross_points = [None] * len(highest_two)
 
-                hough_lines, hough_lines_lengths, _ = detect_hough_lines_in_contour_roi(frame, mask, outer_contour_rect, margin_perc=0.2, do_imshow=True)
+                hough_lines, hough_lines_lengths, _ = detect_hough_lines_in_contour_roi(frame, mask, outer_contour_rect, margin_perc=0.2, do_imshow=debug_mode)
 
                 two_distance_sums = np.zeros(2, dtype=np.float64)
 
@@ -208,7 +261,8 @@ def main(config: AppConfig | None = None):
                         geometry_utils.points_are_collinear(cropped_points[point_indices[2]], cropped_points[point_indices[3]], cropped_points[point_indices[4]], threshold_distance_ratio=0.2):
                         final_highest_p = highest_p
                         final_cross_point = cross_point
-                        print ('triangle is line')
+                        if debug_mode:
+                            print ('triangle is line')
 
                     cross_points[index] = cross_point
 
@@ -249,7 +303,7 @@ def main(config: AppConfig | None = None):
 
                 # drawing the points that got reordered
                 #
-                if True:
+                if debug_mode:
                     for p, point in enumerate(points):
                         cv2.circle(preview, point, 5, (255, 0, 0), -1)
                         cv2.line(preview, point, points[p + 1 if p < len(points) - 1 else 0], (255, 0, 0), 2)
@@ -257,11 +311,13 @@ def main(config: AppConfig | None = None):
 
                 if final_cross_point is not None:
 
-                    cv2.circle(preview, geometry_utils.as_int_point(final_cross_point), 5, (0, 0, 255), -1)
+                    if debug_mode:
+                        cv2.circle(preview, geometry_utils.as_int_point(final_cross_point), 5, (0, 0, 255), -1)
 
                     top_face_points = [geometry_utils.as_int_point(points[0]), geometry_utils.as_int_point(points[1]), geometry_utils.as_int_point(final_cross_point), geometry_utils.as_int_point(points[5])]
-                    for p,point in enumerate(top_face_points):
-                        cv2.line(preview, point, top_face_points[p + 1 if p < len(top_face_points) - 1 else 0], (255, 0, 0), 4)
+                    if debug_mode:
+                        for p,point in enumerate(top_face_points):
+                            cv2.line(preview, point, top_face_points[p + 1 if p < len(top_face_points) - 1 else 0], (255, 0, 0), 4)
 
                     # homography the top_face_points into a new image, and show it with cv2.imshow
                     #
@@ -297,17 +353,18 @@ def main(config: AppConfig | None = None):
                     if circles is not None:
                         rounded_circles = np.round(circles[0]).astype(int)
                         num_dots = len(rounded_circles)
-                        for circle_x, circle_y, circle_radius in rounded_circles:
-                            cv2.circle(top_face_warp, (circle_x, circle_y), circle_radius, (0, 255, 255), 2)
-                            cv2.circle(top_face_warp, (circle_x, circle_y), 2, (255, 0, 255), -1)
+                        if debug_mode:
+                            for circle_x, circle_y, circle_radius in rounded_circles:
+                                cv2.circle(top_face_warp, (circle_x, circle_y), circle_radius, (0, 255, 255), 2)
+                                cv2.circle(top_face_warp, (circle_x, circle_y), 2, (255, 0, 255), -1)
                     label_x = min(point[0] for point in top_face_points)
                     label_y = max(20, min(point[1] for point in top_face_points) - 12)
-                    cv2.putText(preview, str(num_dots), (label_x, label_y), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (255, 255, 255), 3, cv2.LINE_AA)
+                    draw_count_sphere(preview, num_dots, (label_x, label_y))
                             
         cv2.imshow("Dice Final", preview)
 
 
-        if top_face_warp is not None:
+        if debug_mode and top_face_warp is not None:
             cv2.imshow("Dice Top Face", top_face_warp)
             if blurred_mask_preview is not None:
                 cv2.imshow("Dice Blurred Mask", blurred_mask_preview)
@@ -321,6 +378,12 @@ def main(config: AppConfig | None = None):
                 paused_frame = frame.copy()
             else:
                 paused_frame = None
+        elif key in (ord("d"), ord("D")):
+            debug_mode = not debug_mode
+            if not debug_mode:
+                close_debug_windows()
+            if paused:
+                redraw_paused_frame = True
         elif paused and key == config.left_arrow_key:
             target_frame = max(config.start_frame, frame_number - 1)
             cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)

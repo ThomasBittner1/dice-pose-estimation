@@ -2,7 +2,7 @@ import cv2
 
 
 class CountSphereRenderer:
-    def __init__(self, fade_speed=0.35, position_blend=0.25):
+    def __init__(self, fade_speed=0.35, position_blend=0.05):
         self.fade_speed = fade_speed
         self.position_blend = position_blend
         self.opacity = 0.0

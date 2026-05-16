@@ -7,7 +7,7 @@ class TrackingState(Enum):
 
 
 class StabilityTracker:
-    def __init__(self, threshold=0.8, required_stable_frames=5, required_moving_frames=5):
+    def __init__(self, threshold, required_stable_frames, required_moving_frames):
         self.threshold = threshold
         self.required_stable_frames = required_stable_frames
         self.required_moving_frames = required_moving_frames

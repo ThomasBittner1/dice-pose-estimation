@@ -14,16 +14,15 @@ from tracking_state import StabilityTracker
 class AppConfig:
     video_source: str | int = "green_cube_2.mp4"
     playback_delay_ms: int = 20
-    left_arrow_key: int = 2424832
-    right_arrow_key: int = 2555904
     start_frame: int = 0
     start_paused: bool = True
-    run_while_on_pause: bool = False
     debug_mode: bool = False
+    stable_similarity_threshold: float = 0.8
     dice_hsv_min: tuple[int, int, int] = (26, 59, 30)
     dice_hsv_max: tuple[int, int, int] = (98, 255, 250)
     top_face_green_hsv_min: tuple[int, int, int] = (62, 37, 92)
     top_face_green_hsv_max: tuple[int, int, int] = (89, 255, 249)
+    count_sphere_required_count_frames: int = 5
 
 
 def close_debug_windows():
@@ -51,7 +50,11 @@ def main(config: AppConfig | None = None):
     paused_frame = None
     redraw_paused_frame = False
     prev_points = None
-    stability_tracker = StabilityTracker()
+    stability_tracker = StabilityTracker(
+        threshold=config.stable_similarity_threshold,
+        required_stable_frames=config.count_sphere_required_count_frames,
+        required_moving_frames=config.count_sphere_required_count_frames,
+    )
     count_sphere_renderer = drawing.CountSphereRenderer()
     pending_count_sphere_count = None
     pending_count_sphere_count_frames = 0
@@ -59,7 +62,7 @@ def main(config: AppConfig | None = None):
     frame_number = config.start_frame - 1
 
     while True:
-        if paused and paused_frame is not None and not config.run_while_on_pause and not redraw_paused_frame:
+        if paused and paused_frame is not None and not redraw_paused_frame:
             key = cv2.waitKeyEx(config.playback_delay_ms)
             if key in (ord("q"), ord("Q")):
                 break
@@ -71,12 +74,12 @@ def main(config: AppConfig | None = None):
                 if not debug_mode:
                     close_debug_windows()
                 redraw_paused_frame = True
-            elif key == config.left_arrow_key:
+            elif key == 2424832:  # left key
                 target_frame = max(config.start_frame, frame_number - 1)
                 cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
                 frame_number = target_frame - 1
                 paused_frame = None
-            elif key == config.right_arrow_key:
+            elif key == 2555904:  # right key
                 paused_frame = None
             continue
 
@@ -358,7 +361,7 @@ def main(config: AppConfig | None = None):
                 pending_count_sphere_count = count_sphere_count
                 pending_count_sphere_count_frames = 1
 
-            if pending_count_sphere_count_frames >= 5:
+            if pending_count_sphere_count_frames >= config.count_sphere_required_count_frames:
                 show_count_sphere_count = pending_count_sphere_count
 
         count_sphere_renderer.update_and_draw(
@@ -391,12 +394,12 @@ def main(config: AppConfig | None = None):
                 close_debug_windows()
             if paused:
                 redraw_paused_frame = True
-        elif paused and key == config.left_arrow_key:
+        elif paused and key == 2424832:  # left key
             target_frame = max(config.start_frame, frame_number - 1)
             cap.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
             frame_number = target_frame - 1
             paused_frame = None
-        elif paused and key == config.right_arrow_key:
+        elif paused and key == 2555904:  # right key
             paused_frame = None
 
     cap.release()

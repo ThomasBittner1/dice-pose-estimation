@@ -45,6 +45,7 @@ def main(config: AppConfig | None = None):
     paused = config.start_paused
     paused_frame = None
     redraw_paused_frame = False
+    prev_points = None
     frame_number = config.start_frame - 1
 
     while True:
@@ -130,6 +131,7 @@ def main(config: AppConfig | None = None):
 
             similarity_score = geometry_utils.get_similarity_score(points, prev_points)
             print (similarity_score)
+            prev_points = points.copy()
 
             if len(points) == 4: # [[0, 2], [1, 3]]
                 # hough_lines = hough_lines.squeeze()

@@ -2,6 +2,66 @@ import cv2
 import numpy as np
 
 
+def get_similarity_score(points, reference_points, penalize_different_count=0.2, penalize_position_difference=1.0):
+    points = _as_point_array(points)
+    reference_points = _as_point_array(reference_points)
+
+    if len(points) == 0 and len(reference_points) == 0:
+        return 1.0
+    if len(points) == 0 or len(reference_points) == 0:
+        return 0.0
+
+    matched_distances = _get_closest_point_distances(points, reference_points)
+    if len(matched_distances) == 0:
+        return 0.0
+
+    count_difference = abs(len(points) - len(reference_points))
+    count_score = max(0.0, 1.0 - count_difference * penalize_different_count)
+
+    position_scale = _get_point_set_scale(points, reference_points)
+    normalized_position_difference = float(np.mean(matched_distances)) / position_scale
+    position_score = max(0.0, 1.0 - normalized_position_difference * penalize_position_difference)
+
+    return min(1.0, count_score * position_score)
+
+
+def _as_point_array(points):
+    if points is None:
+        return np.empty((0, 2), dtype=np.float64)
+
+    points = np.asarray(points, dtype=np.float64)
+    if points.size == 0:
+        return np.empty((0, 2), dtype=np.float64)
+
+    return points.reshape(-1, 2)
+
+
+def _get_closest_point_distances(points, reference_points):
+    distances = np.linalg.norm(points[:, None, :] - reference_points[None, :, :], axis=2)
+    matched_distances = []
+
+    while distances.size and min(distances.shape) > 0:
+        flat_index = int(np.argmin(distances))
+        point_index, reference_index = np.unravel_index(flat_index, distances.shape)
+        matched_distances.append(float(distances[point_index, reference_index]))
+        distances = np.delete(distances, point_index, axis=0)
+        distances = np.delete(distances, reference_index, axis=1)
+
+    return matched_distances
+
+
+def _get_point_set_scale(points, reference_points):
+    points_scale = _get_single_point_set_scale(points)
+    reference_scale = _get_single_point_set_scale(reference_points)
+    return max(points_scale, reference_scale, 1.0)
+
+
+def _get_single_point_set_scale(points):
+    min_point = np.min(points, axis=0)
+    max_point = np.max(points, axis=0)
+    return float(np.linalg.norm(max_point - min_point))
+
+
 def approximate_contour_corners(contour, epsilon_ratio):
     contour_perimeter = cv2.arcLength(contour, True)
     approximated_contour = cv2.approxPolyDP(contour, epsilon_ratio * contour_perimeter, True)

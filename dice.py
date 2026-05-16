@@ -57,6 +57,7 @@ def main(config: AppConfig | None = None):
         threshold=config.stable_similarity_threshold,
         required_frames=config.stable_required_frames,
     )
+    count_sphere_renderer = drawing.CountSphereRenderer()
     frame_number = config.start_frame - 1
 
     while True:
@@ -102,6 +103,8 @@ def main(config: AppConfig | None = None):
         preview = frame.copy()
         top_face_warp = None
         blurred_mask_preview = None
+        count_sphere_count = None
+        count_sphere_position = None
         if debug_mode:
             frame_text = f"frame: {frame_number}"
             text_size, _ = cv2.getTextSize(frame_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
@@ -135,13 +138,17 @@ def main(config: AppConfig | None = None):
                     cv2.line(preview, point, points[p + 1 if p < len(points) - 1 else 0], (0, 255, 0), 3)
                     cv2.putText(preview, str(p), point, cv2.FONT_HERSHEY_SIMPLEX, 1.45, (0, 255, 0), 2, cv2.LINE_AA)
 
-            tracking_state = stability_tracker.update(geometry_utils.get_similarity_score(points, prev_points))
+            similarity_score = geometry_utils.get_similarity_score(points, prev_points)
+            tracking_state = stability_tracker.update(similarity_score)
             prev_points = points.copy()
 
             if debug_mode:
                 state_text = tracking_state.name.lower()
                 cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 5, cv2.LINE_AA)
                 cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)
+                similarity_text = f"similarity: {similarity_score:.3f}"
+                cv2.putText(preview, similarity_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 5, cv2.LINE_AA)
+                cv2.putText(preview, similarity_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2, cv2.LINE_AA)
 
             if len(points) == 4: # [[0, 2], [1, 3]]
                 if len(parallels) == 2 and len(parallels[0]) == 2 and len(parallels[1]) == 2:
@@ -343,7 +350,15 @@ def main(config: AppConfig | None = None):
                                 cv2.circle(blurred_mask_preview, (circle_x, circle_y), 2, (255, 0, 255), -1)
                     label_x = min(point[0] for point in top_face_points)
                     label_y = max(20, min(point[1] for point in top_face_points) - 12)
-                    drawing.draw_count_sphere(preview, num_dots, (label_x, label_y))
+                    count_sphere_count = num_dots
+                    count_sphere_position = (label_x, label_y)
+
+        count_sphere_renderer.update_and_draw(
+            preview,
+            count_sphere_count,
+            count_sphere_position,
+            stability_tracker.is_stable,
+        )
                             
         cv2.imshow("Dice Final", preview)
 

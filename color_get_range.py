@@ -450,7 +450,7 @@ class HSVControlsDialog(QtWidgets.QDialog):
 def main():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
 
-    cap = cv2.VideoCapture('green_cube_3.mp4')
+    cap = cv2.VideoCapture('green_cube_2.mp4')
     if not cap.isOpened():
         print("Error: Could not open webcam.")
         return
@@ -513,7 +513,6 @@ def main():
             # contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             # contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
             contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-            print('hierarchy: ', hierarchy)
             display_color = DISPLAY_COLOR
 
             for contour in contours:

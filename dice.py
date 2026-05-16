@@ -318,7 +318,6 @@ def main(config: AppConfig | None = None):
                     hsv = cv2.cvtColor(top_face_warp, cv2.COLOR_BGR2HSV)
                     green_range = cv2.inRange(hsv, np.array([61, 42, 100], dtype=np.uint8), np.array([81, 255, 248], dtype=np.uint8))
                     mask = cv2.bitwise_not(green_range)
-                    # contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     num_dots = 0
                     blurred_mask = cv2.GaussianBlur(mask, (9, 9), 2)
                     blurred_mask_preview = cv2.cvtColor(blurred_mask, cv2.COLOR_GRAY2BGR)

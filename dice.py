@@ -7,6 +7,7 @@ import numpy as np
 import drawing
 import geometry_utils
 from hough_utils import detect_hough_lines_in_contour_roi
+from tracking_state import StabilityTracker
 
 
 @dataclass
@@ -19,6 +20,8 @@ class AppConfig:
     start_paused = True
     run_while_on_pause = False
     debug_mode = False
+    stable_similarity_threshold = 0.95
+    stable_required_frames = 5
 
 
 def close_debug_windows():
@@ -46,6 +49,10 @@ def main(config: AppConfig | None = None):
     paused_frame = None
     redraw_paused_frame = False
     prev_points = None
+    stability_tracker = StabilityTracker(
+        threshold=config.stable_similarity_threshold,
+        required_frames=config.stable_required_frames,
+    )
     frame_number = config.start_frame - 1
 
     while True:
@@ -130,8 +137,14 @@ def main(config: AppConfig | None = None):
                     cv2.putText(preview, str(p), point, cv2.FONT_HERSHEY_SIMPLEX, 1.45, (0, 255, 0), 2, cv2.LINE_AA)
 
             similarity_score = geometry_utils.get_similarity_score(points, prev_points)
+            tracking_state = stability_tracker.update(similarity_score)
             print (similarity_score)
             prev_points = points.copy()
+
+            if debug_mode:
+                state_text = tracking_state.name.lower()
+                cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 5, cv2.LINE_AA)
+                cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)
 
             if len(points) == 4: # [[0, 2], [1, 3]]
                 # hough_lines = hough_lines.squeeze()

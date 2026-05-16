@@ -20,8 +20,6 @@ class AppConfig:
     start_paused: bool = True
     run_while_on_pause: bool = False
     debug_mode: bool = False
-    stable_similarity_threshold: float = 0.95
-    stable_required_frames: int = 5
     dice_hsv_min: tuple[int, int, int] = (26, 59, 30)
     dice_hsv_max: tuple[int, int, int] = (98, 255, 250)
     top_face_green_hsv_min: tuple[int, int, int] = (62, 37, 92)
@@ -53,10 +51,7 @@ def main(config: AppConfig | None = None):
     paused_frame = None
     redraw_paused_frame = False
     prev_points = None
-    stability_tracker = StabilityTracker(
-        threshold=config.stable_similarity_threshold,
-        required_frames=config.stable_required_frames,
-    )
+    stability_tracker = StabilityTracker()
     count_sphere_renderer = drawing.CountSphereRenderer()
     frame_number = config.start_frame - 1
 

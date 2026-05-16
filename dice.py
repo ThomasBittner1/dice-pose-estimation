@@ -16,7 +16,7 @@ class AppConfig:
     playback_delay_ms: int = 20
     left_arrow_key: int = 2424832
     right_arrow_key: int = 2555904
-    start_frame: int = 6
+    start_frame: int = 0
     start_paused: bool = True
     run_while_on_pause: bool = False
     debug_mode: bool = False

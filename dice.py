@@ -53,6 +53,9 @@ def main(config: AppConfig | None = None):
     prev_points = None
     stability_tracker = StabilityTracker()
     count_sphere_renderer = drawing.CountSphereRenderer()
+    pending_count_sphere_count = None
+    pending_count_sphere_count_frames = 0
+    show_count_sphere_count = None
     frame_number = config.start_frame - 1
 
     while True:
@@ -348,9 +351,19 @@ def main(config: AppConfig | None = None):
                     count_sphere_count = num_dots
                     count_sphere_position = (label_x, label_y)
 
+        if count_sphere_count is not None:
+            if count_sphere_count == pending_count_sphere_count:
+                pending_count_sphere_count_frames += 1
+            else:
+                pending_count_sphere_count = count_sphere_count
+                pending_count_sphere_count_frames = 1
+
+            if pending_count_sphere_count_frames >= 5:
+                show_count_sphere_count = pending_count_sphere_count
+
         count_sphere_renderer.update_and_draw(
             preview,
-            count_sphere_count,
+            show_count_sphere_count,
             count_sphere_position,
             stability_tracker.is_stable,
         )

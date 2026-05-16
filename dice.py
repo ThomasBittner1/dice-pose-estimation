@@ -106,6 +106,8 @@ def main(config: AppConfig | None = None):
         blurred_mask_preview = None
         count_sphere_count = None
         count_sphere_position = None
+        similarity_score = 0
+        tracking_state = stability_tracker.state
         if debug_mode:
             frame_text = f"frame: {frame_number}"
             text_size, _ = cv2.getTextSize(frame_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
@@ -140,16 +142,7 @@ def main(config: AppConfig | None = None):
                     cv2.putText(preview, str(p), point, cv2.FONT_HERSHEY_SIMPLEX, 1.45, (0, 255, 0), 2, cv2.LINE_AA)
 
             similarity_score = geometry_utils.get_similarity_score(points, prev_points)
-            tracking_state = stability_tracker.update(similarity_score)
             prev_points = points.copy()
-
-            if debug_mode:
-                state_text = tracking_state.name.lower()
-                cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 5, cv2.LINE_AA)
-                cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)
-                similarity_text = f"similarity: {similarity_score:.3f}"
-                cv2.putText(preview, similarity_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 5, cv2.LINE_AA)
-                cv2.putText(preview, similarity_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2, cv2.LINE_AA)
 
             if len(points) == 4: # [[0, 2], [1, 3]]
                 if len(parallels) == 2 and len(parallels[0]) == 2 and len(parallels[1]) == 2:
@@ -216,7 +209,6 @@ def main(config: AppConfig | None = None):
                         points = points.tolist()
                         points.insert((from_point_index+1) % len(points), new_point)
                         points = np.array(points, dtype=int)
-
 
             # drawing the points that got fixed
             #
@@ -355,6 +347,15 @@ def main(config: AppConfig | None = None):
                     label_y = min(point[1] for point in top_face_points)
                     count_sphere_count = num_dots
                     count_sphere_position = (label_x, label_y)
+
+        tracking_state = stability_tracker.update(0 if count_sphere_count is None else similarity_score)
+        if debug_mode:
+            state_text = tracking_state.name.lower()
+            cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 0), 5, cv2.LINE_AA)
+            cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)
+            similarity_text = f"similarity: {similarity_score:.3f}"
+            cv2.putText(preview, similarity_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 0), 5, cv2.LINE_AA)
+            cv2.putText(preview, similarity_text, (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2, cv2.LINE_AA)
 
         if count_sphere_count is not None:
             if count_sphere_count == pending_count_sphere_count:

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
+import drawing
 import geometry_utils
 from hough_utils import detect_hough_lines_in_contour_roi
 
@@ -18,38 +19,6 @@ class AppConfig:
     start_paused = True
     run_while_on_pause = False
     debug_mode = False
-
-
-def draw_count_sphere(image, count, text_origin):
-    text = str(count)
-    font_face = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = 1.1
-    thickness = 3
-    text_size, baseline = cv2.getTextSize(text, font_face, font_scale, thickness)
-    text_width, text_height = text_size
-    center = (text_origin[0] + text_width // 2, text_origin[1] - text_height // 2)
-    radius = max(24, max(text_width, text_height + baseline) // 2 + 14)
-
-    center = (
-        min(max(radius + 4, center[0]), image.shape[1] - radius - 4),
-        min(max(radius + 4, center[1]), image.shape[0] - radius - 4),
-    )
-    text_origin = (center[0] - text_width // 2, center[1] + text_height // 2)
-
-    overlay = image.copy()
-    for current_radius in range(radius, 0, -1):
-        ratio = current_radius / radius
-        color = (
-            int(45 + 40 * (1 - ratio)),
-            int(135 + 80 * (1 - ratio)),
-            int(235 + 20 * (1 - ratio)),
-        )
-        cv2.circle(overlay, center, current_radius, color, -1, cv2.LINE_AA)
-
-    cv2.addWeighted(overlay, 0.82, image, 0.18, 0, image)
-    cv2.circle(image, center, radius, (255, 255, 255), 2, cv2.LINE_AA)
-    cv2.putText(image, text, text_origin, font_face, font_scale, (20, 20, 20), thickness + 2, cv2.LINE_AA)
-    cv2.putText(image, text, text_origin, font_face, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
 
 def close_debug_windows():
@@ -158,6 +127,9 @@ def main(config: AppConfig | None = None):
                     cv2.circle(preview, point, 5, (0, 0, 255), -1)
                     cv2.line(preview, point, points[p + 1 if p < len(points) - 1 else 0], (0, 255, 0), 3)
                     cv2.putText(preview, str(p), point, cv2.FONT_HERSHEY_SIMPLEX, 1.45, (0, 255, 0), 2, cv2.LINE_AA)
+
+            similarity_score = geometry_utils.get_similarity_score(points, prev_points)
+            print (similarity_score)
 
             if len(points) == 4: # [[0, 2], [1, 3]]
                 # hough_lines = hough_lines.squeeze()
@@ -359,7 +331,7 @@ def main(config: AppConfig | None = None):
                                 cv2.circle(top_face_warp, (circle_x, circle_y), 2, (255, 0, 255), -1)
                     label_x = min(point[0] for point in top_face_points)
                     label_y = max(20, min(point[1] for point in top_face_points) - 12)
-                    draw_count_sphere(preview, num_dots, (label_x, label_y))
+                    drawing.draw_count_sphere(preview, num_dots, (label_x, label_y))
                             
         cv2.imshow("Dice Final", preview)
 

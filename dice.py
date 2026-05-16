@@ -12,16 +12,16 @@ from tracking_state import StabilityTracker
 
 @dataclass
 class AppConfig:
-    camera_index = 0
-    playback_delay_ms = 20
-    left_arrow_key = 2424832
-    right_arrow_key = 2555904
-    start_frame = 6 # 218 #217 # 544 # 156 # 288 # 14
-    start_paused = True
-    run_while_on_pause = False
-    debug_mode = False
-    stable_similarity_threshold = 0.95
-    stable_required_frames = 5
+    video_source: str | int = "green_cube_2.mp4"
+    playback_delay_ms: int = 20
+    left_arrow_key: int = 2424832
+    right_arrow_key: int = 2555904
+    start_frame: int = 6
+    start_paused: bool = True
+    run_while_on_pause: bool = False
+    debug_mode: bool = False
+    stable_similarity_threshold: float = 0.95
+    stable_required_frames: int = 5
 
 
 def close_debug_windows():
@@ -37,9 +37,9 @@ def main(config: AppConfig | None = None):
         config = AppConfig()
 
     debug_mode = config.debug_mode
-    cap = cv2.VideoCapture('green_cube_2.mp4')
+    cap = cv2.VideoCapture(config.video_source)
     if not cap.isOpened():
-        print(f"Error: Could not open camera {config.camera_index}.")
+        print(f"Error: Could not open video source {config.video_source}.")
         sys.exit(1)
 
     if config.start_frame > 0:
@@ -95,7 +95,6 @@ def main(config: AppConfig | None = None):
                 break
             cv2.flip(frame, 1, frame)
             frame_number += 1
-        # print ('frame_number: ', frame_number)
         preview = frame.copy()
         top_face_warp = None
         blurred_mask_preview = None
@@ -105,13 +104,9 @@ def main(config: AppConfig | None = None):
             text_x = preview.shape[1] - text_size[0] - 20
             cv2.putText(preview, frame_text, (text_x, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
 
-
-        # extract green color
         hsv = cv2.cvtColor(preview, cv2.COLOR_BGR2HSV)
-        # mask = cv2.inRange(hsv, np.array([39, 85, 0], dtype=np.uint8), np.array([95, 255, 253], dtype=np.uint8))
         mask = cv2.inRange(hsv, np.array([26, 59, 30], dtype=np.uint8), np.array([98, 255, 250], dtype=np.uint8))
 
-        # draw the outer contour of the mask into preview
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             outer_contour = max(contours, key=cv2.contourArea)
@@ -120,24 +115,19 @@ def main(config: AppConfig | None = None):
 
             if debug_mode:
                 cv2.drawContours(preview, [outer_contour], -1, (255, 255, 255), 1)
-            # for contour_point in outer_contour.reshape(-1, 2):
-            #     cv2.circle(preview, tuple(contour_point), 4, (255, 255, 0), -1)
 
             points = geometry_utils.approximate_contour_corners(outer_contour, 0.02) #corner_epsilon_ratio)
             points = np.squeeze(points)
             parallels = geometry_utils.group_polygon_edges_by_parallel_direction(points, min_line_length=0.1, angle_threshold_degrees=30)
             edge_lengths = [np.linalg.norm(points[(i+1) % len(points)]-points[i]) for i in range(len(points))]
 
-            # drawing the points that where found from approximate_contour_corners
-            #
             if debug_mode:
                 for p, point in enumerate(points):
                     cv2.circle(preview, point, 5, (0, 0, 255), -1)
                     cv2.line(preview, point, points[p + 1 if p < len(points) - 1 else 0], (0, 255, 0), 3)
                     cv2.putText(preview, str(p), point, cv2.FONT_HERSHEY_SIMPLEX, 1.45, (0, 255, 0), 2, cv2.LINE_AA)
 
-            similarity_score = geometry_utils.get_similarity_score(points, prev_points)
-            tracking_state = stability_tracker.update(similarity_score)
+            tracking_state = stability_tracker.update(geometry_utils.get_similarity_score(points, prev_points))
             prev_points = points.copy()
 
             if debug_mode:
@@ -146,8 +136,6 @@ def main(config: AppConfig | None = None):
                 cv2.putText(preview, state_text, (20, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2, cv2.LINE_AA)
 
             if len(points) == 4: # [[0, 2], [1, 3]]
-                # hough_lines = hough_lines.squeeze()
-
                 if len(parallels) == 2 and len(parallels[0]) == 2 and len(parallels[1]) == 2:
                     hough_lines, hough_lines_lengths, hough_directions = detect_hough_lines_in_contour_roi(frame, mask, outer_contour_rect, do_imshow=debug_mode)
 

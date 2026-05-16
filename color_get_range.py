@@ -9,21 +9,12 @@ from PySide6 import QtCore
 from PySide6 import QtGui
 from PySide6 import QtWidgets
 
-import colors_utils
-
 COLOR_NAME = "green"
 DEFAULT_MIN_VALS = (26, 59, 30)
 DEFAULT_MAX_VALS = (98, 255, 250)
 DISPLAY_COLOR = (0, 255, 0)
 
 CONFIG_PATH = Path("hsv_config.json")
-CALIBRATION_PATH = Path("camera_calibration.json")
-POSE_MARKER_POINTS = {
-    "red": (0.0, 0.0, 0.0),
-    "green": (0.0, 4.5, 0.0),
-    "yellow": (-7.071, 0.0, -2.929),
-    "blue": (-7.071, 4.5, -2.928),
-}
 
 
 def _is_valid_hsv_triplet(values):
@@ -445,7 +436,7 @@ class HSVControlsDialog(QtWidgets.QDialog):
         return config
 
     def save_values(self):
-        pass
+        save_config(self.get_values())
 
 def main():
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
@@ -493,7 +484,7 @@ def main():
         open_mask_preview = None
         mask_preview = None
 
-        for color_name, color_data in current_colors.items():
+        for color_data in current_colors.values():
             mask = cv2.inRange(
                 hsv,
                 np.array(color_data["min_vals"], dtype=np.uint8),
@@ -510,32 +501,11 @@ def main():
             mask = close_mask
             mask_preview = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
 
-            # contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            # contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
             display_color = DISPLAY_COLOR
 
             for contour in contours:
                 cv2.drawContours(frame, [contour], -1, display_color, 2)
-
-                moments = cv2.moments(contour)
-                if moments["m00"] != 0:
-                    text_x = int(moments["m10"] / moments["m00"])
-                    text_y = int(moments["m01"] / moments["m00"])
-                    sample_x = text_x
-                    sample_y = text_y
-                else:
-                    x, y, w, h = cv2.boundingRect(contour)
-                    text_x = x
-                    text_y = y - 10 if y > 20 else y + h + 20
-                    sample_x = x + w // 2
-                    sample_y = y + h // 2
-
-                sample_x = max(0, min(sample_x, hsv.shape[1] - 1))
-                sample_y = max(0, min(sample_y, hsv.shape[0] - 1))
-
-                h, s, v = hsv[sample_y, sample_x]
-                hsv_text = f"{color_name}: ({int(h)}, {int(s)}, {int(v)})"
 
 
         if raw_mask_preview is None:

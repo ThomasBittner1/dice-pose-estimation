@@ -349,8 +349,10 @@ def main(config: AppConfig | None = None):
                             for circle_x, circle_y, circle_radius in rounded_circles:
                                 cv2.circle(blurred_mask_preview, (circle_x, circle_y), circle_radius, (0, 255, 255), 2)
                                 cv2.circle(blurred_mask_preview, (circle_x, circle_y), 2, (255, 0, 255), -1)
-                    label_x = min(point[0] for point in top_face_points)
-                    label_y = max(20, min(point[1] for point in top_face_points) - 12)
+                    min_x = min(point[0] for point in top_face_points)
+                    max_x = max(point[0] for point in top_face_points)
+                    label_x = (min_x + max_x) // 2
+                    label_y = min(point[1] for point in top_face_points)
                     count_sphere_count = num_dots
                     count_sphere_position = (label_x, label_y)
 

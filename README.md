@@ -32,6 +32,8 @@ Debug mode shows the intermediate geometry and masks used by the pipeline:
 - detected dice contour and approximated/repaired corner points
 - selected top-face outline and intersection point
 - separate windows for the cropped edge/Hough-line view, warped top face, and blurred dot mask
+![Alt text](debug_mode.jpg)  
+
 
 
 # How to use it on a dice with different colors

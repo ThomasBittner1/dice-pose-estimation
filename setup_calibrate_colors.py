@@ -33,7 +33,7 @@ DISPLAY_COLORS = {
 
 @dataclass
 class AppConfig:
-    video_source: str | int = "green_cube_2.mp4"
+    video_source: str | int = "green_dice.mp4"
     start_frame: int = 6
     start_paused: bool = True
     flip_frame_horizontal: bool = False

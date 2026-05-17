@@ -58,23 +58,9 @@ To compensate this, the setup file setup_color_get_range.py can update the color
 ```powershell
 pip install -r requirements.txt
 ```
-**2. Patch fix the boxmot package**  
-``` powershell
-python _install_fix_boxmot.py
-```
 
-
-**3. Download Embedding Model files**  
-  - `net_19.pth`
-  - `opts.yaml`  
-
-https://drive.google.com/file/d/1STbsacssLtlHpUesNzuTeUPrfMlWbSKu/view  
-(Source: https://github.com/regob/vehicle_mtmc)  
-After downloading the file, put *net_19.pth* and *opts.yaml* into the root folder.
-
-**4. Download input videos**  
-https://www.aicitychallenge.org/2022-track1-download
-Put the main folder **AICity22_Track1_MTMC_Tracking** into the root folder of this project.
+**3. Download Video File**  
+green_cube.mp4
 
 
 ## Run

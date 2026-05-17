@@ -33,23 +33,6 @@ class AppConfig:
 
 
 @dataclass
-class FrameSource:
-    capture: cv2.VideoCapture
-    start_frame: int
-    frame_number: int
-    paused: bool
-    paused_frame: np.ndarray | None = None
-    redraw_paused_frame: bool = False
-
-
-@dataclass
-class DiceSegmentation:
-    mask: np.ndarray
-    outer_contour: np.ndarray | None
-    outer_contour_rect: tuple[int, int, int, int] | None
-
-
-@dataclass
 class ContourGeometry:
     points: np.ndarray
     similarity_reference_points: np.ndarray
@@ -111,84 +94,6 @@ def close_debug_windows():
             pass
 
 
-def open_frame_source(config: AppConfig) -> FrameSource:
-    capture = cv2.VideoCapture(config.video_source)
-    if not capture.isOpened():
-        print(f"Error: Could not open video source {config.video_source}.")
-        sys.exit(1)
-
-    if config.start_frame > 0:
-        capture.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame)
-
-    return FrameSource(
-        capture=capture,
-        start_frame=config.start_frame,
-        frame_number=config.start_frame - 1,
-        paused=config.start_paused,
-    )
-
-
-def should_wait_on_paused_frame(frame_source: FrameSource) -> bool:
-    return (
-        frame_source.paused
-        and frame_source.paused_frame is not None
-        and not frame_source.redraw_paused_frame
-    )
-
-
-def read_frame(frame_source: FrameSource) -> np.ndarray | None:
-    if frame_source.paused:
-        if frame_source.paused_frame is None:
-            frame = _read_next_frame(frame_source)
-            if frame is None:
-                return None
-            frame_source.paused_frame = frame.copy()
-
-        frame_source.redraw_paused_frame = False
-        return frame_source.paused_frame.copy()
-
-    return _read_next_frame(frame_source)
-
-
-def _read_next_frame(frame_source: FrameSource) -> np.ndarray | None:
-    ret, frame = frame_source.capture.read()
-    if not ret:
-        print("Error: Failed to read frame from video source.")
-        return None
-
-    cv2.flip(frame, 1, frame)
-    frame_source.frame_number += 1
-    return frame
-
-
-def handle_key(key: int, frame_source: FrameSource, debug_mode: bool, current_frame: np.ndarray | None) -> tuple[bool, bool]:
-    if key in QUIT_KEYS:
-        return debug_mode, True
-
-    if key == SPACE_KEY:
-        frame_source.paused = not frame_source.paused
-        frame_source.paused_frame = current_frame.copy() if frame_source.paused and current_frame is not None else None
-    elif key in DEBUG_KEYS:
-        debug_mode = not debug_mode
-        if not debug_mode:
-            close_debug_windows()
-        if frame_source.paused:
-            frame_source.redraw_paused_frame = True
-    elif frame_source.paused and key == LEFT_ARROW_KEY:
-        seek_relative(frame_source, -1)
-    elif frame_source.paused and key == RIGHT_ARROW_KEY:
-        frame_source.paused_frame = None
-
-    return debug_mode, False
-
-
-def seek_relative(frame_source: FrameSource, frame_delta: int):
-    target_frame = max(frame_source.start_frame, frame_source.frame_number + frame_delta)
-    frame_source.capture.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
-    frame_source.frame_number = target_frame - 1
-    frame_source.paused_frame = None
-
-
 def run_pipeline(
     frame: np.ndarray,
     config: AppConfig,
@@ -199,16 +104,18 @@ def run_pipeline(
     preview = frame.copy()
     draw_frame_number(preview, frame_number, debug_mode)
 
-    segmentation = segment_dice(preview, config)
-    if segmentation.outer_contour is None or segmentation.outer_contour_rect is None:
+    mask, outer_contour, outer_contour_rect = segment_dice(preview, config)
+    if outer_contour is None or outer_contour_rect is None:
         return PipelineResult(preview=preview), previous_points
 
     if debug_mode:
-        cv2.drawContours(preview, [segmentation.outer_contour], -1, (255, 255, 255), 1)
+        cv2.drawContours(preview, [outer_contour], -1, (255, 255, 255), 1)
 
     contour_geometry = extract_contour_geometry(
         frame,
-        segmentation,
+        mask,
+        outer_contour,
+        outer_contour_rect,
         previous_points,
         preview,
         frame_number,
@@ -217,7 +124,7 @@ def run_pipeline(
     if contour_geometry is None:
         return PipelineResult(preview=preview), previous_points
 
-    top_face = estimate_top_face(frame, segmentation, contour_geometry.points, preview, debug_mode)
+    top_face = estimate_top_face(frame, mask, outer_contour_rect, contour_geometry.points, preview, debug_mode)
     result = PipelineResult(
         preview=preview,
         similarity_score=contour_geometry.similarity_score,
@@ -234,7 +141,7 @@ def run_pipeline(
     return result, contour_geometry.similarity_reference_points.copy()
 
 
-def segment_dice(frame: np.ndarray, config: AppConfig) -> DiceSegmentation:
+def segment_dice(frame: np.ndarray, config: AppConfig) -> tuple[np.ndarray, np.ndarray | None, tuple[int, int, int, int] | None]:
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(
         hsv,
@@ -244,25 +151,23 @@ def segment_dice(frame: np.ndarray, config: AppConfig) -> DiceSegmentation:
 
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        return DiceSegmentation(mask=mask, outer_contour=None, outer_contour_rect=None)
+        return mask, None, None
 
     outer_contour = max(contours, key=cv2.contourArea)
-    return DiceSegmentation(
-        mask=mask,
-        outer_contour=outer_contour,
-        outer_contour_rect=cv2.boundingRect(outer_contour),
-    )
+    return mask, outer_contour, cv2.boundingRect(outer_contour)
 
 
 def extract_contour_geometry(
     frame: np.ndarray,
-    segmentation: DiceSegmentation,
+    mask: np.ndarray,
+    outer_contour: np.ndarray,
+    outer_contour_rect: tuple[int, int, int, int],
     previous_points: np.ndarray | None,
     preview: np.ndarray,
     frame_number: int,
     debug_mode: bool,
 ) -> ContourGeometry | None:
-    points = geometry_utils.approximate_contour_corners(segmentation.outer_contour, 0.02)
+    points = geometry_utils.approximate_contour_corners(outer_contour, 0.02)
     points = np.squeeze(points)
     if points.ndim != 2 or len(points) < 3:
         return None
@@ -271,7 +176,7 @@ def extract_contour_geometry(
 
     similarity_score = geometry_utils.get_similarity_score(points, previous_points)
     similarity_reference_points = points.copy()
-    points = repair_contour_points(frame, segmentation, points, frame_number, debug_mode)
+    points = repair_contour_points(frame, mask, outer_contour_rect, points, frame_number, debug_mode)
 
     draw_polygon_debug(preview, points, (0, 0, 255), line_thickness=2, text_thickness=1, enabled=debug_mode)
     return ContourGeometry(
@@ -283,7 +188,8 @@ def extract_contour_geometry(
 
 def repair_contour_points(
     frame: np.ndarray,
-    segmentation: DiceSegmentation,
+    mask: np.ndarray,
+    outer_contour_rect: tuple[int, int, int, int],
     points: np.ndarray,
     frame_number: int,
     debug_mode: bool,
@@ -296,7 +202,7 @@ def repair_contour_points(
     edge_lengths = get_polygon_edge_lengths(points)
 
     if len(points) == 4:
-        return repair_four_point_contour(frame, segmentation, points, parallels, edge_lengths, debug_mode)
+        return repair_four_point_contour(frame, mask, outer_contour_rect, points, parallels, edge_lengths, debug_mode)
     if len(points) == 5:
         return repair_five_point_contour(points, parallels, edge_lengths, frame_number, debug_mode)
 
@@ -305,7 +211,8 @@ def repair_contour_points(
 
 def repair_four_point_contour(
     frame: np.ndarray,
-    segmentation: DiceSegmentation,
+    mask: np.ndarray,
+    outer_contour_rect: tuple[int, int, int, int],
     points: np.ndarray,
     parallels: list[list[int]],
     edge_lengths: list[float],
@@ -314,11 +221,11 @@ def repair_four_point_contour(
     if not (len(parallels) == 2 and len(parallels[0]) == 2 and len(parallels[1]) == 2):
         return points
 
-    _, _, _, outer_contour_h = segmentation.outer_contour_rect
+    _, _, _, outer_contour_h = outer_contour_rect
     hough_lines, hough_lines_lengths, hough_directions = detect_hough_lines_in_contour_roi(
         frame,
-        segmentation.mask,
-        segmentation.outer_contour_rect,
+        mask,
+        outer_contour_rect,
         do_imshow=debug_mode,
     )
 
@@ -426,7 +333,8 @@ def normalize_five_point_parallel_groups(parallels: list[list[int]]) -> list[lis
 
 def estimate_top_face(
     frame: np.ndarray,
-    segmentation: DiceSegmentation,
+    mask: np.ndarray,
+    outer_contour_rect: tuple[int, int, int, int],
     points: np.ndarray,
     preview: np.ndarray,
     debug_mode: bool,
@@ -434,7 +342,7 @@ def estimate_top_face(
     if len(points) != 6:
         return None
 
-    ordered_points, cross_point = order_points_for_top_face(frame, segmentation, points, debug_mode)
+    ordered_points, cross_point = order_points_for_top_face(frame, mask, outer_contour_rect, points, debug_mode)
     if cross_point is None:
         return None
 
@@ -460,7 +368,8 @@ def estimate_top_face(
 
 def order_points_for_top_face(
     frame: np.ndarray,
-    segmentation: DiceSegmentation,
+    mask: np.ndarray,
+    outer_contour_rect: tuple[int, int, int, int],
     points: np.ndarray,
     debug_mode: bool,
 ) -> tuple[np.ndarray, tuple[float, float] | None]:
@@ -468,13 +377,13 @@ def order_points_for_top_face(
     cross_points = [None] * len(highest_two)
     hough_lines, hough_lines_lengths, _ = detect_hough_lines_in_contour_roi(
         frame,
-        segmentation.mask,
-        segmentation.outer_contour_rect,
+        mask,
+        outer_contour_rect,
         margin_perc=0.2,
         do_imshow=debug_mode,
     )
 
-    outer_contour_x, outer_contour_y, outer_contour_w, _ = segmentation.outer_contour_rect
+    outer_contour_x, outer_contour_y, outer_contour_w, _ = outer_contour_rect
     crop_offset = np.array([outer_contour_x, outer_contour_y], dtype=np.float64)
     cropped_points = points.astype(np.float64) - crop_offset
     distance_sums = np.zeros(2, dtype=np.float64)
@@ -734,7 +643,18 @@ def main(config: AppConfig | None = None):
         config = AppConfig()
 
     debug_mode = config.debug_mode
-    frame_source = open_frame_source(config)
+    capture = cv2.VideoCapture(config.video_source)
+    if not capture.isOpened():
+        print(f"Error: Could not open video source {config.video_source}.")
+        sys.exit(1)
+
+    if config.start_frame > 0:
+        capture.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame)
+
+    paused = config.start_paused
+    paused_frame = None
+    redraw_paused_frame = False
+    frame_number = config.start_frame - 1
     previous_points = None
     stability_tracker = StabilityTracker(
         threshold=config.stable_similarity_threshold,
@@ -746,23 +666,54 @@ def main(config: AppConfig | None = None):
     current_frame = None
 
     while True:
-        if should_wait_on_paused_frame(frame_source):
+        if paused and paused_frame is not None and not redraw_paused_frame:
             key = cv2.waitKeyEx(config.playback_delay_ms)
-            debug_mode, should_quit = handle_key(key, frame_source, debug_mode, current_frame)
-            if should_quit:
+            if key in QUIT_KEYS:
                 break
+            if key == SPACE_KEY:
+                paused = False
+                paused_frame = None
+            elif key in DEBUG_KEYS:
+                debug_mode = not debug_mode
+                if not debug_mode:
+                    close_debug_windows()
+                redraw_paused_frame = True
+            elif key == LEFT_ARROW_KEY:
+                target_frame = max(config.start_frame, frame_number - 1)
+                capture.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+                frame_number = target_frame - 1
+                paused_frame = None
+            elif key == RIGHT_ARROW_KEY:
+                paused_frame = None
             continue
 
-        frame = read_frame(frame_source)
-        if frame is None:
-            break
+        if paused:
+            if paused_frame is None:
+                ret, frame = capture.read()
+                if not ret:
+                    print("Error: Failed to read frame from video source.")
+                    break
+                cv2.flip(frame, 1, frame)
+                frame_number += 1
+                paused_frame = frame.copy()
+
+            frame = paused_frame.copy()
+            redraw_paused_frame = False
+        else:
+            ret, frame = capture.read()
+            if not ret:
+                print("Error: Failed to read frame from video source.")
+                break
+            cv2.flip(frame, 1, frame)
+            frame_number += 1
+
         current_frame = frame.copy()
 
         result, previous_points = run_pipeline(
             frame,
             config,
             previous_points,
-            frame_source.frame_number,
+            frame_number,
             debug_mode,
         )
         draw_pipeline_result(
@@ -775,11 +726,26 @@ def main(config: AppConfig | None = None):
         show_windows(result, debug_mode)
 
         key = cv2.waitKeyEx(config.playback_delay_ms)
-        debug_mode, should_quit = handle_key(key, frame_source, debug_mode, current_frame)
-        if should_quit:
+        if key in QUIT_KEYS:
             break
+        if key == SPACE_KEY:
+            paused = not paused
+            paused_frame = current_frame.copy() if paused and current_frame is not None else None
+        elif key in DEBUG_KEYS:
+            debug_mode = not debug_mode
+            if not debug_mode:
+                close_debug_windows()
+            if paused:
+                redraw_paused_frame = True
+        elif paused and key == LEFT_ARROW_KEY:
+            target_frame = max(config.start_frame, frame_number - 1)
+            capture.set(cv2.CAP_PROP_POS_FRAMES, target_frame)
+            frame_number = target_frame - 1
+            paused_frame = None
+        elif paused and key == RIGHT_ARROW_KEY:
+            paused_frame = None
 
-    frame_source.capture.release()
+    capture.release()
     cv2.destroyAllWindows()
 
 

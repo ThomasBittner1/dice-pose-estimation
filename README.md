@@ -60,7 +60,8 @@ were a static camera, certain miss-classifications could show more than in a mov
 - Currently the setup gets confused quickly if there are objects in the scene with similar colors as the dice
   
 # Ideas to improve
-- add stuff - 
+More time could be spent on the top face detection, add more edge cases, 
+to minimize false classifications on dot counting. 
 
 ## Install
 

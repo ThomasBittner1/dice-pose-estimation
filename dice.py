@@ -1,5 +1,7 @@
+import json
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -15,6 +17,33 @@ DEBUG_KEYS = (ord("d"), ord("D"))
 SPACE_KEY = ord(" ")
 LEFT_ARROW_KEY = 2424832
 RIGHT_ARROW_KEY = 2555904
+COLOR_RANGES_PATH = Path(__file__).with_name("color_ranges.json")
+DICE_BODY_CONTOUR_COLOR_NAME = "dice_body_contour"
+DICE_FACE_COLOR_NAME = "dice_face_color"
+DEFAULT_DICE_HSV_MIN = (26, 59, 30)
+DEFAULT_DICE_HSV_MAX = (98, 255, 250)
+DEFAULT_TOP_FACE_GREEN_HSV_MIN = (62, 37, 92)
+DEFAULT_TOP_FACE_GREEN_HSV_MAX = (89, 255, 249)
+
+
+def load_hsv_range(color_name, value_name, fallback):
+    if not COLOR_RANGES_PATH.exists():
+        return fallback
+
+    try:
+        with COLOR_RANGES_PATH.open("r", encoding="utf-8") as config_file:
+            color_config = json.load(config_file)
+    except (OSError, json.JSONDecodeError, TypeError):
+        return fallback
+
+    values = color_config.get(color_name, {}).get(value_name)
+    if not isinstance(values, (list, tuple)) or len(values) != 3:
+        return fallback
+
+    try:
+        return tuple(int(value) for value in values)
+    except (TypeError, ValueError):
+        return fallback
 
 
 @dataclass
@@ -25,10 +54,18 @@ class AppConfig:
     start_paused: bool = True
     flip_frame_horizontal: bool = False
     stable_similarity_threshold: float = 0.85
-    dice_hsv_min: tuple[int, int, int] = (26, 59, 30)
-    dice_hsv_max: tuple[int, int, int] = (98, 255, 250)
-    top_face_green_hsv_min: tuple[int, int, int] = (62, 37, 92)
-    top_face_green_hsv_max: tuple[int, int, int] = (89, 255, 249)
+    dice_hsv_min: tuple[int, int, int] = field(
+        default_factory=lambda: load_hsv_range(DICE_BODY_CONTOUR_COLOR_NAME, "min_vals", DEFAULT_DICE_HSV_MIN)
+    )
+    dice_hsv_max: tuple[int, int, int] = field(
+        default_factory=lambda: load_hsv_range(DICE_BODY_CONTOUR_COLOR_NAME, "max_vals", DEFAULT_DICE_HSV_MAX)
+    )
+    top_face_green_hsv_min: tuple[int, int, int] = field(
+        default_factory=lambda: load_hsv_range(DICE_FACE_COLOR_NAME, "min_vals", DEFAULT_TOP_FACE_GREEN_HSV_MIN)
+    )
+    top_face_green_hsv_max: tuple[int, int, int] = field(
+        default_factory=lambda: load_hsv_range(DICE_FACE_COLOR_NAME, "max_vals", DEFAULT_TOP_FACE_GREEN_HSV_MAX)
+    )
     count_sphere_required_count_frames: int = 5
     contour_epsilon_ratio: float = 0.02
     parallel_min_line_length: float = 0.1

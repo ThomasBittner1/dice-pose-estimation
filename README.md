@@ -47,26 +47,39 @@ It makes you choose 2 colors. Both colors are main color of the dice (green in t
 In the lower part (*dice_face_color*) adjust the sliders so the dots on the top face have strong black contours. This
 is needed for the actual dot counting
 
+
 # Difficulties
-The outputs from openCv functions are extremely messy. The main difficulty is probably that cv2.approxPolyDP()  returns
-many points that are not located at actual corners. And with the corners of the dice already being rounded, many corners
-aren't even detected.  
-However since the dots are located more inside of the face instead of near the border, the actual dot counting is 
-relatively forgiving.
+One of the main challenges was dealing with the noisy output produced by several OpenCV functions. 
+In particular, `cv2.approxPolyDP()` often returns many points that don't correspond to actual corners. 
+This issue was further complicated by the rounded edges of the dice, which caused some real corners to be 
+missed entirely.  
+Despite the unreliable corner detection, the dot-counting stage proved to be relatively robust. Since the 
+dots are positioned closer to the center of each face rather than near the edges, the algorithm remained 
+reasonably tolerant to inaccuracies in the detected contours and corner positions.
 
 
-# Known Issues  
-- The detector currently relies on HSV color segmentation, so it is sensitive to lighting. To compensate this, the 
-setup file setup_color_get_range.py can update the colors.
-- Because of the messy top face detection, in certain frames he classifies the count to be one or two points higher or lower. 
-This often gets fixed automatically by the algorithm requiring a number to show at least a few frames to be accepted. This 
-works well in the current video because the camera is moving and therefore it's always fixing itself. However if this 
-were a static camera, certain miss-classifications could show more than in a moving camera.
-- Currently the setup gets confused quickly if there are objects in the scene with similar colors as the dice
-  
-# Ideas to improve
-More time could be spent on the top face detection, add more edge cases, 
-to minimize false classifications on dot counting. 
+# Known Issues
+- The detector currently relies on HSV color segmentation, making it sensitive to lighting conditions. 
+To partially compensate for this, the setup utility `setup_color_get_range.py` can be used to recalibrate 
+the color ranges for different environments.
+
+- Due to the noisy top-face detection, some frames may be classified one or two points higher or lower than 
+the correct value. In practice, this is often corrected automatically because the algorithm only accepts a 
+result after it has remained stable for several consecutive frames. This works well with a moving camera, 
+where changing perspectives help correct temporary misclassifications. With a static camera setup, however, 
+incorrect classifications may persist for longer periods.
+
+- The current implementation can become unreliable when objects with colors similar to the dice are present 
+in the scene, as they may interfere with the color segmentation stage.
+
+
+# Ideas for Improvement
+
+- Additional work could be done on the top-face detection stage to make it even more reliable under difficult viewing 
+angles and lighting conditions.
+
+- The color segmentation pipeline could be improved to adapt automatically to changing lighting conditions 
+instead of requiring manual recalibration.
 
 ## Install
 

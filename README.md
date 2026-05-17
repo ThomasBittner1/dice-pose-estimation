@@ -60,7 +60,7 @@ reasonably tolerant to inaccuracies in the detected contours and corner position
 
 # Known Issues
 - The detector currently relies on HSV color segmentation, making it sensitive to lighting conditions. 
-To partially compensate for this, the setup utility `setup_color_get_range.py` can be used to recalibrate 
+To partially compensate for this, the setup utility `setup_calibrate_colors.py` can be used to recalibrate 
 the color ranges for different environments.
 
 - Due to the noisy top-face detection, some frames may be classified one or two points higher or lower than 

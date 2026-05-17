@@ -107,7 +107,6 @@ class PipelineResult:
     count_sphere_position: tuple[int, int] | None = None
     top_face_warp: np.ndarray | None = None
     blurred_mask_preview: np.ndarray | None = None
-    contour_points: np.ndarray | None = None
 
 
 def close_debug_windows():
@@ -166,7 +165,6 @@ def run_pipeline(
     result = PipelineResult(
         preview=preview,
         similarity_score=similarity_score,
-        contour_points=contour_points,
     )
 
     if top_face_result is not None:

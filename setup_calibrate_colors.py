@@ -117,10 +117,9 @@ class HuePickCommand(QtGui.QUndoCommand):
 
 
 class SliderRow(QtWidgets.QHBoxLayout):
-    def __init__(self, label_text, minimum, maximum, value, on_change, undo_stack):
+    def __init__(self, label_text, minimum, maximum, value, undo_stack):
         super().__init__()
 
-        self.on_change = on_change
         self.undo_stack = undo_stack
         self._drag_start_value = value
         self._ignore_undo = False
@@ -145,7 +144,6 @@ class SliderRow(QtWidgets.QHBoxLayout):
 
     def _handle_value_changed(self, value):
         self.value_label.setText(str(value))
-        self.on_change()
 
     def _handle_slider_pressed(self):
         self._drag_start_value = self.slider.value()
@@ -260,12 +258,12 @@ class HSVControlsDialog(QtWidgets.QDialog):
         max_vals = color_data["max_vals"]
 
         color_rows = {
-            "h_min": SliderRow("H min", 0, 179, min_vals[0], self.save_values, self.undo_stack),
-            "h_max": SliderRow("H max", 0, 179, max_vals[0], self.save_values, self.undo_stack),
-            "s_min": SliderRow("S min", 0, 255, min_vals[1], self.save_values, self.undo_stack),
-            "s_max": SliderRow("S max", 0, 255, max_vals[1], self.save_values, self.undo_stack),
-            "v_min": SliderRow("V min", 0, 255, min_vals[2], self.save_values, self.undo_stack),
-            "v_max": SliderRow("V max", 0, 255, max_vals[2], self.save_values, self.undo_stack),
+            "h_min": SliderRow("H min", 0, 179, min_vals[0], self.undo_stack),
+            "h_max": SliderRow("H max", 0, 179, max_vals[0], self.undo_stack),
+            "s_min": SliderRow("S min", 0, 255, min_vals[1], self.undo_stack),
+            "s_max": SliderRow("S max", 0, 255, max_vals[1], self.undo_stack),
+            "v_min": SliderRow("V min", 0, 255, min_vals[2], self.undo_stack),
+            "v_max": SliderRow("V max", 0, 255, max_vals[2], self.undo_stack),
         }
 
         self.rows[color_name] = color_rows
@@ -280,7 +278,6 @@ class HSVControlsDialog(QtWidgets.QDialog):
 
         invert_checkbox = QtWidgets.QCheckBox("Invert")
         invert_checkbox.setChecked(bool(color_data.get("invert", False)))
-        invert_checkbox.toggled.connect(self.save_values)
         color_rows["invert"] = invert_checkbox
         form_layout.addRow("Mask", invert_checkbox)
 
@@ -442,7 +439,6 @@ class HSVControlsDialog(QtWidgets.QDialog):
     def _set_hue_range(self, color_name, h_min, h_max):
         self.rows[color_name]["h_min"].set_value_from_undo(h_min)
         self.rows[color_name]["h_max"].set_value_from_undo(h_max)
-        self.save_values()
 
     def set_hue_range_from_pick(self, color_name, hue_value):
         old_min = self.rows[color_name]["h_min"].value()
@@ -482,9 +478,6 @@ class HSVControlsDialog(QtWidgets.QDialog):
                 "invert": color_rows["invert"].isChecked(),
             }
         return config
-
-    def save_values(self):
-        pass
 
 def main(config: AppConfig | None = None):
     if config is None:

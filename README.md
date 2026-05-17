@@ -37,32 +37,30 @@ Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on
 # Debug Mode
 - description of what the debug mode does - 
 
+# Try on Different Cube or Different environment
+Currently things are setup for that specific green dice. If you want to run it on a different dice or a different lighting
+setup, the setup_color_ranges.py needs to be run to pick different color ranges.
+
 
 # Difficulties
-The output from openCv functions are extremely messy. The main difficulty is probably that cv2.approxPolyDP()  returns
+The outputs from openCv functions are extremely messy. The main difficulty is probably that cv2.approxPolyDP()  returns
 many points that are not located at actual corners. And with the corners of the dice already being rounded, many corners
 aren't even detected.  
-Therefore the results of the top face detections are extremely messy, however since the dots are located more inside of
-the face instead of near the border, the algorithm of the actual dot counting is relatively forgiving.
-
-
+However since the dots are located more inside of the face instead of near the border, the actual dot counting is 
+relatively forgiving.
 
 
 # Known Issues  
-- Since this is basic computer vision and no deep learning, it's very sensitive to lighting changes. 
-To compensate this, the setup file setup_color_get_range.py can update the colors.
+- The detector currently relies on HSV color segmentation, so it is sensitive to lighting. To compensate this, the 
+setup file setup_color_get_range.py can update the colors.
 - Because of the messy top face detection, in certain frames he classifies the count to be one or two points higher or lower. 
-This automatically gets fixed by the algorithm requiring a number to show at least a few frames to be accepted. This works well because
-the camera is moving and therefore it's always fixing itself. However if this were a static camera, certain miss-classifications
-could show more than in a moving camera.
-
-
+This often gets fixed automatically by the algorithm requiring a number to show at least a few frames to be accepted. This 
+works well in the current video because the camera is moving and therefore it's always fixing itself. However if this 
+were a static camera, certain miss-classifications could show more than in a moving camera.
+- Currently the setup gets confused quickly if there are objects in the scene with similar colors as the dice
+  
 # Ideas to improve
-- Tune the YOLO model 
-- Batch or parallelize embedding inference for better real-time performance.
-- Fine-tune embeddings model to get better embedding scores 
-- Distribute source-camera embedding inference more efficiently to get a better FPS rate
-
+- add stuff - 
 
 ## Install
 

@@ -33,26 +33,6 @@ class AppConfig:
 
 
 @dataclass
-class ContourGeometry:
-    points: np.ndarray
-    similarity_reference_points: np.ndarray
-    similarity_score: float
-
-
-@dataclass
-class TopFaceEstimate:
-    points: list[tuple[int, int]]
-    warp: np.ndarray
-    label_position: tuple[int, int]
-
-
-@dataclass
-class PipDetection:
-    count: int
-    blurred_mask_preview: np.ndarray
-
-
-@dataclass
 class PipelineResult:
     preview: np.ndarray
     similarity_score: float = 0.0
@@ -111,7 +91,7 @@ def run_pipeline(
     if debug_mode:
         cv2.drawContours(preview, [outer_contour], -1, (255, 255, 255), 1)
 
-    contour_geometry = extract_contour_geometry(
+    contour_result = extract_contour_geometry(
         frame,
         mask,
         outer_contour,
@@ -121,24 +101,26 @@ def run_pipeline(
         frame_number,
         debug_mode,
     )
-    if contour_geometry is None:
+    if contour_result is None:
         return PipelineResult(preview=preview), previous_points
 
-    top_face = estimate_top_face(frame, mask, outer_contour_rect, contour_geometry.points, preview, debug_mode)
+    contour_points, similarity_reference_points, similarity_score = contour_result
+    top_face_result = estimate_top_face(frame, mask, outer_contour_rect, contour_points, preview, debug_mode)
     result = PipelineResult(
         preview=preview,
-        similarity_score=contour_geometry.similarity_score,
-        contour_points=contour_geometry.points,
+        similarity_score=similarity_score,
+        contour_points=contour_points,
     )
 
-    if top_face is not None:
-        pip_detection = detect_pips(top_face.warp, config, debug_mode)
-        result.count_sphere_count = pip_detection.count
-        result.count_sphere_position = top_face.label_position
-        result.top_face_warp = top_face.warp
-        result.blurred_mask_preview = pip_detection.blurred_mask_preview
+    if top_face_result is not None:
+        top_face_points, top_face_warp, count_sphere_position = top_face_result
+        pip_count, blurred_mask_preview = detect_pips(top_face_warp, config, debug_mode)
+        result.count_sphere_count = pip_count
+        result.count_sphere_position = count_sphere_position
+        result.top_face_warp = top_face_warp
+        result.blurred_mask_preview = blurred_mask_preview
 
-    return result, contour_geometry.similarity_reference_points.copy()
+    return result, similarity_reference_points.copy()
 
 
 def segment_dice(frame: np.ndarray, config: AppConfig) -> tuple[np.ndarray, np.ndarray | None, tuple[int, int, int, int] | None]:
@@ -166,7 +148,7 @@ def extract_contour_geometry(
     preview: np.ndarray,
     frame_number: int,
     debug_mode: bool,
-) -> ContourGeometry | None:
+) -> tuple[np.ndarray, np.ndarray, float] | None:
     points = geometry_utils.approximate_contour_corners(outer_contour, 0.02)
     points = np.squeeze(points)
     if points.ndim != 2 or len(points) < 3:
@@ -179,11 +161,7 @@ def extract_contour_geometry(
     points = repair_contour_points(frame, mask, outer_contour_rect, points, frame_number, debug_mode)
 
     draw_polygon_debug(preview, points, (0, 0, 255), line_thickness=2, text_thickness=1, enabled=debug_mode)
-    return ContourGeometry(
-        points=points,
-        similarity_reference_points=similarity_reference_points,
-        similarity_score=similarity_score,
-    )
+    return points, similarity_reference_points, similarity_score
 
 
 def repair_contour_points(
@@ -338,7 +316,7 @@ def estimate_top_face(
     points: np.ndarray,
     preview: np.ndarray,
     debug_mode: bool,
-) -> TopFaceEstimate | None:
+) -> tuple[list[tuple[int, int]], np.ndarray, tuple[int, int]] | None:
     if len(points) != 6:
         return None
 
@@ -359,11 +337,7 @@ def estimate_top_face(
     draw_top_face_debug(preview, top_face_points, debug_mode)
 
     top_face_warp = warp_top_face(frame, top_face_points)
-    return TopFaceEstimate(
-        points=top_face_points,
-        warp=top_face_warp,
-        label_position=get_top_face_label_position(top_face_points),
-    )
+    return top_face_points, top_face_warp, get_top_face_label_position(top_face_points)
 
 
 def order_points_for_top_face(
@@ -508,7 +482,7 @@ def warp_top_face(frame: np.ndarray, top_face_points: list[tuple[int, int]]) -> 
     return cv2.warpPerspective(frame, homography, (top_size, top_size))
 
 
-def detect_pips(top_face_warp: np.ndarray, config: AppConfig, debug_mode: bool) -> PipDetection:
+def detect_pips(top_face_warp: np.ndarray, config: AppConfig, debug_mode: bool) -> tuple[int, np.ndarray]:
     hsv = cv2.cvtColor(top_face_warp, cv2.COLOR_BGR2HSV)
     green_range = cv2.inRange(
         hsv,
@@ -533,7 +507,7 @@ def detect_pips(top_face_warp: np.ndarray, config: AppConfig, debug_mode: bool) 
     )
 
     if circles is None:
-        return PipDetection(count=0, blurred_mask_preview=blurred_mask_preview)
+        return 0, blurred_mask_preview
 
     rounded_circles = np.round(circles[0]).astype(int)
     if debug_mode:
@@ -541,7 +515,7 @@ def detect_pips(top_face_warp: np.ndarray, config: AppConfig, debug_mode: bool) 
             cv2.circle(blurred_mask_preview, (circle_x, circle_y), circle_radius, (0, 255, 255), 2)
             cv2.circle(blurred_mask_preview, (circle_x, circle_y), 2, (255, 0, 255), -1)
 
-    return PipDetection(count=len(rounded_circles), blurred_mask_preview=blurred_mask_preview)
+    return len(rounded_circles), blurred_mask_preview
 
 
 def draw_pipeline_result(

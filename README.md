@@ -39,11 +39,20 @@ Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on
 
 
 # Difficulties
+The output from openCv functions are extremely messy. The main difficulty is probably that cv2.approxPolyDP()  returns
+many points that are not located at actual corners. And with the corners of the dice already being rounded, many corners
+aren't even detected.  
+Therefore the results of the top face detections are extremely messy, however since the dots are located more inside of
+the face instead of near the border, the algorithm of the actual dot counting is relatively forgiving.
+
+
 
 
 # Known Issues  
-Since this is basic computer vision and no deep learning, it's very sensitive to lighting changes. 
-To compensate this, the setup file setup_color_get_range.py can update the colors. 
+- Since this is basic computer vision and no deep learning, it's very sensitive to lighting changes. 
+To compensate this, the setup file setup_color_get_range.py can update the colors.
+- In some cases 
+
 
 # Ideas to improve
 - Tune the YOLO model 

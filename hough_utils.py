@@ -2,31 +2,48 @@ import cv2
 import numpy as np
 
 
-def detect_hough_lines_in_contour_roi(frame, mask, outer_contour_rect, margin_perc=0.0, do_imshow=False):
+def detect_hough_lines_in_contour_roi(
+    frame,
+    mask,
+    outer_contour_rect,
+    canny_threshold1,
+    canny_threshold2,
+    hough_rho,
+    hough_theta_degrees,
+    hough_threshold,
+    min_line_length_min_pixels,
+    min_line_length_width_divisor,
+    max_line_gap_min_pixels,
+    max_line_gap_width_divisor,
+    vertical_keep_min_y_ratio,
+    vertical_keep_max_y_ratio,
+    margin_perc,
+    do_imshow=False,
+):
     outer_contour_x, outer_contour_y, outer_contour_w, outer_contour_h = outer_contour_rect
     cropped_mask = mask[outer_contour_y:outer_contour_y + outer_contour_h, outer_contour_x:outer_contour_x + outer_contour_w]
     cropped_frame = frame[outer_contour_y:outer_contour_y + outer_contour_h, outer_contour_x:outer_contour_x + outer_contour_w]
 
     cropped_extracted_by_mask = cv2.bitwise_and(cropped_frame, cropped_frame, mask=cropped_mask)
     cropped_gray = cv2.cvtColor(cropped_extracted_by_mask, cv2.COLOR_BGR2GRAY)
-    extracted_edges = cv2.Canny(cropped_gray, 0, 40)
+    extracted_edges = cv2.Canny(cropped_gray, canny_threshold1, canny_threshold2)
     extracted_edges = cv2.bitwise_and(extracted_edges, extracted_edges, mask=cropped_mask)
 
     edges_preview = cv2.cvtColor(extracted_edges, cv2.COLOR_GRAY2BGR)
     hough_lines = cv2.HoughLinesP(
         extracted_edges,
-        1,
-        np.pi / 180,
-        threshold=20,
-        minLineLength=max(10, outer_contour_w // 5),
-        maxLineGap=max(4, outer_contour_w // 20),
+        hough_rho,
+        np.deg2rad(hough_theta_degrees),
+        threshold=hough_threshold,
+        minLineLength=max(min_line_length_min_pixels, outer_contour_w // min_line_length_width_divisor),
+        maxLineGap=max(max_line_gap_min_pixels, outer_contour_w // max_line_gap_width_divisor),
     )
     if hough_lines is not None:
         hough_lines_points = hough_lines.reshape(-1, 4)
 
         line_mid_y = (hough_lines_points[:, 1] + hough_lines_points[:, 3]) / 2.0
-        min_y = outer_contour_h * 0.15
-        max_y = outer_contour_h * 0.85
+        min_y = outer_contour_h * vertical_keep_min_y_ratio
+        max_y = outer_contour_h * vertical_keep_max_y_ratio
         vertical_keep_mask = (line_mid_y >= min_y) & (line_mid_y <= max_y)
         margin_x = outer_contour_w * margin_perc
         margin_y = outer_contour_h * margin_perc

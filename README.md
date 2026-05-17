@@ -51,7 +51,10 @@ the face instead of near the border, the algorithm of the actual dot counting is
 # Known Issues  
 - Since this is basic computer vision and no deep learning, it's very sensitive to lighting changes. 
 To compensate this, the setup file setup_color_get_range.py can update the colors.
-- In some cases 
+- Because of the messy top face detection, in certain frames he classifies the count to be one or two points higher or lower. 
+This automatically gets fixed by the algorithm requiring a number to show at least a few frames to be accepted. This works well because
+the camera is moving and therefore it's always fixing itself. However if this were a static camera, certain miss-classifications
+could show more than in a moving camera.
 
 
 # Ideas to improve

@@ -24,12 +24,43 @@ class AppConfig:
     start_frame: int = 0
     start_paused: bool = True
     debug_mode: bool = False
+    flip_frame_horizontal: bool = True
     stable_similarity_threshold: float = 0.85
     dice_hsv_min: tuple[int, int, int] = (26, 59, 30)
     dice_hsv_max: tuple[int, int, int] = (98, 255, 250)
     top_face_green_hsv_min: tuple[int, int, int] = (62, 37, 92)
     top_face_green_hsv_max: tuple[int, int, int] = (89, 255, 249)
     count_sphere_required_count_frames: int = 5
+    contour_epsilon_ratio: float = 0.02
+    parallel_min_line_length: float = 0.1
+    parallel_angle_threshold_degrees: float = 30.0
+    hough_canny_threshold1: int = 0
+    hough_canny_threshold2: int = 40
+    hough_rho: float = 1.0
+    hough_theta_degrees: float = 1.0
+    hough_threshold: int = 20
+    hough_min_line_length_min_pixels: int = 10
+    hough_min_line_length_width_divisor: int = 5
+    hough_max_line_gap_min_pixels: int = 4
+    hough_max_line_gap_width_divisor: int = 20
+    hough_vertical_keep_min_y_ratio: float = 0.15
+    hough_vertical_keep_max_y_ratio: float = 0.85
+    repair_hough_margin_percent: float = 0.0
+    repair_hough_direction_angle_threshold_degrees: float = 30.0
+    top_face_hough_margin_percent: float = 0.2
+    top_face_hough_parallel_angle_threshold_degrees: float = 15.0
+    top_face_hough_distance_threshold_width_ratio: float = 0.1
+    top_face_hough_overlap_percentage_threshold: float = 0.4
+    pip_blur_kernel_size: tuple[int, int] = (9, 9)
+    pip_blur_sigma: float = 2.0
+    pip_hough_dp: float = 1.2
+    pip_hough_min_dist_min_pixels: int = 10
+    pip_hough_min_dist_size_divisor: int = 5
+    pip_hough_param1: int = 120
+    pip_hough_param2: int = 20
+    pip_min_radius_min_pixels: int = 3
+    pip_min_radius_size_divisor: int = 16
+    pip_max_radius_size_divisor: int = 6
 
 
 @dataclass
@@ -99,13 +130,14 @@ def run_pipeline(
         previous_points,
         preview,
         frame_number,
+        config,
         debug_mode,
     )
     if contour_result is None:
         return PipelineResult(preview=preview), previous_points
 
     contour_points, similarity_reference_points, similarity_score = contour_result
-    top_face_result = estimate_top_face(frame, mask, outer_contour_rect, contour_points, preview, debug_mode)
+    top_face_result = estimate_top_face(frame, mask, outer_contour_rect, contour_points, preview, config, debug_mode)
     result = PipelineResult(
         preview=preview,
         similarity_score=similarity_score,
@@ -147,9 +179,10 @@ def extract_contour_geometry(
     previous_points: np.ndarray | None,
     preview: np.ndarray,
     frame_number: int,
+    config: AppConfig,
     debug_mode: bool,
 ) -> tuple[np.ndarray, np.ndarray, float] | None:
-    points = geometry_utils.approximate_contour_corners(outer_contour, 0.02)
+    points = geometry_utils.approximate_contour_corners(outer_contour, config.contour_epsilon_ratio)
     points = np.squeeze(points)
     if points.ndim != 2 or len(points) < 3:
         return None
@@ -158,7 +191,7 @@ def extract_contour_geometry(
 
     similarity_score = geometry_utils.get_similarity_score(points, previous_points)
     similarity_reference_points = points.copy()
-    points = repair_contour_points(frame, mask, outer_contour_rect, points, frame_number, debug_mode)
+    points = repair_contour_points(frame, mask, outer_contour_rect, points, frame_number, config, debug_mode)
 
     draw_polygon_debug(preview, points, (0, 0, 255), line_thickness=2, text_thickness=1, enabled=debug_mode)
     return points, similarity_reference_points, similarity_score
@@ -170,17 +203,18 @@ def repair_contour_points(
     outer_contour_rect: tuple[int, int, int, int],
     points: np.ndarray,
     frame_number: int,
+    config: AppConfig,
     debug_mode: bool,
 ) -> np.ndarray:
     parallels = geometry_utils.group_polygon_edges_by_parallel_direction(
         points,
-        min_line_length=0.1,
-        angle_threshold_degrees=30,
+        min_line_length=config.parallel_min_line_length,
+        angle_threshold_degrees=config.parallel_angle_threshold_degrees,
     )
     edge_lengths = get_polygon_edge_lengths(points)
 
     if len(points) == 4:
-        return repair_four_point_contour(frame, mask, outer_contour_rect, points, parallels, edge_lengths, debug_mode)
+        return repair_four_point_contour(frame, mask, outer_contour_rect, points, parallels, edge_lengths, config, debug_mode)
     if len(points) == 5:
         return repair_five_point_contour(points, parallels, edge_lengths, frame_number, debug_mode)
 
@@ -194,6 +228,7 @@ def repair_four_point_contour(
     points: np.ndarray,
     parallels: list[list[int]],
     edge_lengths: list[float],
+    config: AppConfig,
     debug_mode: bool,
 ) -> np.ndarray:
     if not (len(parallels) == 2 and len(parallels[0]) == 2 and len(parallels[1]) == 2):
@@ -204,6 +239,18 @@ def repair_four_point_contour(
         frame,
         mask,
         outer_contour_rect,
+        canny_threshold1=config.hough_canny_threshold1,
+        canny_threshold2=config.hough_canny_threshold2,
+        hough_rho=config.hough_rho,
+        hough_theta_degrees=config.hough_theta_degrees,
+        hough_threshold=config.hough_threshold,
+        min_line_length_min_pixels=config.hough_min_line_length_min_pixels,
+        min_line_length_width_divisor=config.hough_min_line_length_width_divisor,
+        max_line_gap_min_pixels=config.hough_max_line_gap_min_pixels,
+        max_line_gap_width_divisor=config.hough_max_line_gap_width_divisor,
+        vertical_keep_min_y_ratio=config.hough_vertical_keep_min_y_ratio,
+        vertical_keep_max_y_ratio=config.hough_vertical_keep_max_y_ratio,
+        margin_perc=config.repair_hough_margin_percent,
         do_imshow=debug_mode,
     )
 
@@ -216,7 +263,7 @@ def repair_four_point_contour(
         similar_direction_indices = geometry_utils.find_direction_aligned_indices(
             highest_line_direction,
             hough_directions,
-            angle_threshold_degrees=30,
+            angle_threshold_degrees=config.repair_hough_direction_angle_threshold_degrees,
         )
         if len(similar_direction_indices):
             longest_similar_hough_index = np.argmax(hough_lines_lengths[similar_direction_indices])
@@ -315,12 +362,13 @@ def estimate_top_face(
     outer_contour_rect: tuple[int, int, int, int],
     points: np.ndarray,
     preview: np.ndarray,
+    config: AppConfig,
     debug_mode: bool,
 ) -> tuple[list[tuple[int, int]], np.ndarray, tuple[int, int]] | None:
     if len(points) != 6:
         return None
 
-    ordered_points, cross_point = order_points_for_top_face(frame, mask, outer_contour_rect, points, debug_mode)
+    ordered_points, cross_point = order_points_for_top_face(frame, mask, outer_contour_rect, points, config, debug_mode)
     if cross_point is None:
         return None
 
@@ -345,6 +393,7 @@ def order_points_for_top_face(
     mask: np.ndarray,
     outer_contour_rect: tuple[int, int, int, int],
     points: np.ndarray,
+    config: AppConfig,
     debug_mode: bool,
 ) -> tuple[np.ndarray, tuple[float, float] | None]:
     highest_two = np.argsort(points[:, 1])[:2]
@@ -353,7 +402,18 @@ def order_points_for_top_face(
         frame,
         mask,
         outer_contour_rect,
-        margin_perc=0.2,
+        canny_threshold1=config.hough_canny_threshold1,
+        canny_threshold2=config.hough_canny_threshold2,
+        hough_rho=config.hough_rho,
+        hough_theta_degrees=config.hough_theta_degrees,
+        hough_threshold=config.hough_threshold,
+        min_line_length_min_pixels=config.hough_min_line_length_min_pixels,
+        min_line_length_width_divisor=config.hough_min_line_length_width_divisor,
+        max_line_gap_min_pixels=config.hough_max_line_gap_min_pixels,
+        max_line_gap_width_divisor=config.hough_max_line_gap_width_divisor,
+        vertical_keep_min_y_ratio=config.hough_vertical_keep_min_y_ratio,
+        vertical_keep_max_y_ratio=config.hough_vertical_keep_max_y_ratio,
+        margin_perc=config.top_face_hough_margin_percent,
         do_imshow=debug_mode,
     )
 
@@ -392,6 +452,7 @@ def order_points_for_top_face(
             hough_lines,
             hough_lines_lengths,
             outer_contour_w,
+            config,
         )
 
     if final_highest_point is None:
@@ -440,6 +501,7 @@ def sum_matching_hough_lengths(
     hough_lines: np.ndarray,
     hough_lines_lengths: np.ndarray,
     outer_contour_w: int,
+    config: AppConfig,
 ) -> float:
     total = 0.0
     for segment_start_index in (1, 5, 3):
@@ -448,14 +510,14 @@ def sum_matching_hough_lengths(
             start_point,
             cropped_cross_point,
             hough_lines,
-            threshold_angle_degrees=15,
+            threshold_angle_degrees=config.top_face_hough_parallel_angle_threshold_degrees,
         )
         close_indices2 = geometry_utils.find_lines_near_segment(
             start_point,
             cropped_cross_point,
             hough_lines[parallel_indices],
-            threshold_distance=outer_contour_w * 0.1,
-            overlap_percentage_threshold=0.4,
+            threshold_distance=outer_contour_w * config.top_face_hough_distance_threshold_width_ratio,
+            overlap_percentage_threshold=config.top_face_hough_overlap_percentage_threshold,
         )
         close_indices = parallel_indices[close_indices2]
         total += float(np.sum(hough_lines_lengths[close_indices]))
@@ -490,18 +552,18 @@ def detect_pips(top_face_warp: np.ndarray, config: AppConfig, debug_mode: bool) 
         np.array(config.top_face_green_hsv_max, dtype=np.uint8),
     )
     mask = cv2.bitwise_not(green_range)
-    blurred_mask = cv2.GaussianBlur(mask, (9, 9), 2)
+    blurred_mask = cv2.GaussianBlur(mask, config.pip_blur_kernel_size, config.pip_blur_sigma)
     blurred_mask_preview = cv2.cvtColor(blurred_mask, cv2.COLOR_GRAY2BGR)
     top_size = top_face_warp.shape[0]
-    min_radius = max(3, top_size // 16)
-    max_radius = max(min_radius + 1, top_size // 6)
+    min_radius = max(config.pip_min_radius_min_pixels, top_size // config.pip_min_radius_size_divisor)
+    max_radius = max(min_radius + 1, top_size // config.pip_max_radius_size_divisor)
     circles = cv2.HoughCircles(
         blurred_mask,
         cv2.HOUGH_GRADIENT,
-        dp=1.2,
-        minDist=max(10, top_size // 5),
-        param1=120,
-        param2=20,
+        dp=config.pip_hough_dp,
+        minDist=max(config.pip_hough_min_dist_min_pixels, top_size // config.pip_hough_min_dist_size_divisor),
+        param1=config.pip_hough_param1,
+        param2=config.pip_hough_param2,
         minRadius=min_radius,
         maxRadius=max_radius,
     )
@@ -667,7 +729,8 @@ def main(config: AppConfig | None = None):
                 if not ret:
                     print("Error: Failed to read frame from video source.")
                     break
-                cv2.flip(frame, 1, frame)
+                if config.flip_frame_horizontal:
+                    cv2.flip(frame, 1, frame)
                 frame_number += 1
                 paused_frame = frame.copy()
 
@@ -678,7 +741,8 @@ def main(config: AppConfig | None = None):
             if not ret:
                 print("Error: Failed to read frame from video source.")
                 break
-            cv2.flip(frame, 1, frame)
+            if config.flip_frame_horizontal:
+                cv2.flip(frame, 1, frame)
             frame_number += 1
 
         current_frame = frame.copy()

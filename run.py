@@ -174,7 +174,6 @@ def run_pipeline(
         mask,
         outer_contour,
         outer_contour_rect,
-        previous_points,
         preview,
         frame_number,
         config,
@@ -183,7 +182,8 @@ def run_pipeline(
     if contour_result is None:
         return PipelineResult(preview=preview), previous_points
 
-    contour_points, similarity_reference_points, similarity_score = contour_result
+    contour_points, similarity_reference_points = contour_result
+    similarity_score = geometry_utils.get_similarity_score(similarity_reference_points, previous_points)
     top_face_result = estimate_top_face(frame, mask, outer_contour_rect, contour_points, preview, config, debug_mode)
     result = PipelineResult(
         preview=preview,
@@ -223,12 +223,11 @@ def extract_contour_geometry(
     mask: np.ndarray,
     outer_contour: np.ndarray,
     outer_contour_rect: tuple[int, int, int, int],
-    previous_points: np.ndarray | None,
     preview: np.ndarray,
     frame_number: int,
     config: AppConfig,
     debug_mode: bool,
-) -> tuple[np.ndarray, np.ndarray, float] | None:
+) -> tuple[np.ndarray, np.ndarray] | None:
     points = geometry_utils.approximate_contour_corners(outer_contour, config.contour_epsilon_ratio)
     points = np.squeeze(points)
     if points.ndim != 2 or len(points) < 3:
@@ -236,12 +235,11 @@ def extract_contour_geometry(
 
     draw_polygon_debug(preview, points, (0, 255, 0), line_thickness=3, text_thickness=2, enabled=debug_mode)
 
-    similarity_score = geometry_utils.get_similarity_score(points, previous_points)
     similarity_reference_points = points.copy()
     points = repair_contour_points(frame, mask, outer_contour_rect, points, frame_number, config, debug_mode)
 
     draw_polygon_debug(preview, points, (0, 0, 255), line_thickness=2, text_thickness=1, enabled=debug_mode)
-    return points, similarity_reference_points, similarity_score
+    return points, similarity_reference_points
 
 
 def repair_contour_points(

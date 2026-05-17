@@ -1,7 +1,8 @@
 # Dice Pose Estimation and Dot Counting
 
-Estimates the top face of the dice and counts its dots.
+Estimates the top face of the dice and counts its dots.  
 ![Alt text](short_video.gif)  
+Click [here](https://youtu.be/X2E6Y16pKWw) to see a longer and larger version on YouTube:
 
 
 # Algorithm

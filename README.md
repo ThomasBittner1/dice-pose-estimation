@@ -1,46 +1,46 @@
-# Cars Multicamera Matching
+# Dice Pose Estimation and Dot Counting
 
 Estimates the top face of the dice and counts its dots.
-
-![Alt text](car_multicamera_short.gif)  
-Click [here](https://youtu.be/telgQXJkKVk) to see a longer and larger version on YouTube:
-
 
 
 # Algorithm
 
-1. **Detection and tracking**
-   - Each camera frame on both cameras is masked so YOLO only sees the relevant road area (in debug mode, click M to see the masks)
-   - A custom YOLO car detector runs on both cameras.
-   - BotSort keeps stable per-camera track IDs for detected vehicles.
+1. **Dice body segmentation**
+   - The calibrated `dice_body_contour` range is used to mask the dice and extract its largest contour.
+   - `cv2.approxPolyDP()` converts that contour into polygon points.
 
-2. **Source-camera gallery creation**
-   - The source camera is treated as the camera where vehicles should appear first.
-   - While a source-camera track is visible, the system saves cropped vehicle images.
-   - Crops are marked as **strong** when the vehicle is large enough, not overlapping another car, and moving in the expected direction. Other usable crops are kept as weak fallback crops.
-   - If a source track crosses one of the configured discard lines (yellow lines), it is removed because it is moving toward an irrelevant exit.
-   - When a source track disappears, the saved crops are converted into vehicle ReID embeddings and averaged into one gallery embedding for that source track.
-   - Source records expire after `source_record_ttl_seconds` so old vehicles are not matched indefinitely.
+2. **Contour repair**
+   - Rounded corners and missing edges often produce incomplete polygon outlines.
+   - Parallel edge groups and Hough lines are used to insert missing points and recover a 6-point cube outline.
 
-3. **Query-camera candidate filtering**
-   - Query-camera tracks are ignored if they appear in an area marked as not coming from the source camera (in debug mode, click O to see the mask)
-   - For each remaining query track, the system stores ReID embeddings from its visible crops over time.
-   - A query track becomes matchable after it crosses the configured query entry line.
+3. **Top-face estimation**
+   - Ray intersections and Hough line evidence choose the most plausible top face from the 6-point outline.
+   - The selected top-face corners are warped into a square top-down view with a homography in order to make the dots as circular as possible for the `cv2.HoughCircles()` algorithm.
 
-4. **Cross-camera matching**
-   - After a query track crosses the red entry line, its stored embeddings are averaged.
-   - The averaged query embedding is compared with the source gallery using cosine similarity.
-   - Matches are only considered if enough travel time has passed between the source track leaving and the query track crossing the entry line.
-   - Weak source crops are penalized, and matches below the embedding-score threshold are treated as no match.
+4. **Dot counting**
+   - The warped top face is masked with `dice_face_color` and inverted so the dark dots become foreground.
+   - `cv2.HoughCircles()` counts the visible dots.
 
+5. **Temporal stabilization**
+   - Frame-to-frame contour similarity estimates whether the dice is stable.
+   - A count must repeat for several frames before it is displayed.
+   
 
 # Debug Mode
 - description of what the debug mode does - 
 
 # Try on Different Cube or Different environment
 Currently things are setup for that specific green dice. If you want to run it on a different dice or a different lighting
-setup, the setup_color_ranges.py needs to be run to pick different color ranges.
-
+setup, run
+``` batch
+python setup_calibrate_colors.py
+```
+This opens the following UI:  
+![Alt text](calibrate_colors.jpg)  
+It makes you choose 2 colors. Both colors are main color of the dice (green in this case), but in the upper part 
+(*dice_body_contour*), focus on getting a nice contour, he'll need that to estimate the geometry.  
+In the lower part (*dice_face_color*) adjust the sliders so the dots on the top face have strong black contours. This
+is needed for the actual dot counting
 
 # Difficulties
 The outputs from openCv functions are extremely messy. The main difficulty is probably that cv2.approxPolyDP()  returns

@@ -48,7 +48,7 @@ def load_hsv_range(color_name, value_name, fallback):
 
 @dataclass
 class AppConfig:
-    video_source: str | int = "green_cube_2.mp4"
+    video_source: str | int = "green_dice_0.mp4"
     playback_delay_ms: int = 20
     start_frame: int = 0
     start_paused: bool = True

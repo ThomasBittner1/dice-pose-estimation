@@ -2,19 +2,36 @@ import cv2
 
 
 class CountSphereRenderer:
-    def __init__(self, fade_speed=0.35, position_blend=0.2):
+    def __init__(self, required_count_frames=1, fade_speed=0.35, position_blend=0.2):
+        self.required_count_frames = required_count_frames
         self.fade_speed = fade_speed
         self.position_blend = position_blend
         self.opacity = 0.0
         self.center = None
         self.count = None
+        self.pending_count = None
+        self.pending_count_frames = 0
+
+    def get_visible_count(self, count):
+        if count is None:
+            return self.count
+
+        if count == self.pending_count:
+            self.pending_count_frames += 1
+        else:
+            self.pending_count = count
+            self.pending_count_frames = 1
+
+        if self.pending_count_frames >= self.required_count_frames:
+            self.count = self.pending_count
+
+        return self.count
 
     def update_and_draw(self, image, count, text_origin, is_stable):
-        if count is not None:
-            self.count = count
+        visible_count = self.get_visible_count(count)
 
-        if text_origin is not None and self.count is not None:
-            target_center = _get_count_sphere_center(image, self.count, text_origin)
+        if text_origin is not None and visible_count is not None:
+            target_center = _get_count_sphere_center(image, visible_count, text_origin)
             if self.center is None:
                 self.center = target_center
             else:
@@ -23,13 +40,13 @@ class CountSphereRenderer:
                     self.center[1] * (1.0 - self.position_blend) + target_center[1] * self.position_blend,
                 )
 
-        target_opacity = 1.0 if is_stable and self.count is not None and self.center is not None else 0.0
+        target_opacity = 1.0 if is_stable and visible_count is not None and self.center is not None else 0.0
         self.opacity += (target_opacity - self.opacity) * self.fade_speed
 
-        if self.opacity <= 0.01 or self.center is None or self.count is None:
+        if self.opacity <= 0.01 or self.center is None or visible_count is None:
             return
 
-        _draw_count_sphere_at_center(image, self.count, self.center, self.opacity)
+        _draw_count_sphere_at_center(image, visible_count, self.center, self.opacity)
 
 
 def _get_count_sphere_center(image, count, text_origin):

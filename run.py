@@ -50,7 +50,7 @@ def load_hsv_range(color_name, value_name, fallback):
 class AppConfig:
     video_source: str | int = "green_dice_1.mp4"
     record_video_path: str | None = None
-    start_frame: int = 500
+    start_frame: int = 0 #550
     start_paused: bool = True
     flip_frame_horizontal: bool = False
     stable_similarity_threshold: float = 0.85
@@ -108,29 +108,6 @@ class PipelineResult:
     top_face_warp: np.ndarray | None = None
     blurred_mask_preview: np.ndarray | None = None
     contour_points: np.ndarray | None = None
-
-
-@dataclass
-class CountStabilizer:
-    required_frames: int
-    pending_count: int | None = None
-    pending_count_frames: int = 0
-    visible_count: int | None = None
-
-    def update(self, count: int | None) -> int | None:
-        if count is None:
-            return self.visible_count
-
-        if count == self.pending_count:
-            self.pending_count_frames += 1
-        else:
-            self.pending_count = count
-            self.pending_count_frames = 1
-
-        if self.pending_count_frames >= self.required_frames:
-            self.visible_count = self.pending_count
-
-        return self.visible_count
 
 
 def close_debug_windows():
@@ -621,14 +598,13 @@ def detect_pips(top_face_warp: np.ndarray, config: AppConfig, debug_mode: bool) 
         for circle_x, circle_y, circle_radius in rounded_circles:
             cv2.circle(blurred_mask_preview, (circle_x, circle_y), circle_radius, (0, 255, 255), 2)
             cv2.circle(blurred_mask_preview, (circle_x, circle_y), 2, (255, 0, 255), -1)
-
-    return len(rounded_circles), blurred_mask_preview
+    num_dots = min(len(rounded_circles), 6) if len(rounded_circles) else None
+    return num_dots, blurred_mask_preview
 
 
 def draw_pipeline_result(
     result: PipelineResult,
     stability_tracker: StabilityTracker,
-    count_stabilizer: CountStabilizer,
     count_sphere_renderer: drawing.CountSphereRenderer,
     debug_mode: bool,
 ):
@@ -637,10 +613,9 @@ def draw_pipeline_result(
     )
     draw_tracking_debug(result.preview, tracking_state, result.similarity_score, debug_mode)
 
-    visible_count = count_stabilizer.update(result.count_sphere_count)
     count_sphere_renderer.update_and_draw(
         result.preview,
-        visible_count,
+        result.count_sphere_count,
         result.count_sphere_position,
         stability_tracker.is_stable,
     )
@@ -746,8 +721,9 @@ def main(config: AppConfig | None = None):
         required_stable_frames=config.count_sphere_required_count_frames,
         required_moving_frames=config.count_sphere_required_count_frames,
     )
-    count_stabilizer = CountStabilizer(config.count_sphere_required_count_frames)
-    count_sphere_renderer = drawing.CountSphereRenderer()
+    count_sphere_renderer = drawing.CountSphereRenderer(
+        required_count_frames=config.count_sphere_required_count_frames,
+    )
     current_frame = None
     video_writer = None
     video_writer_failed = False
@@ -799,7 +775,7 @@ def main(config: AppConfig | None = None):
         current_frame = frame.copy()
 
         result, previous_mask = run_pipeline(frame, config, previous_mask, frame_number, debug_mode)
-        draw_pipeline_result(result, stability_tracker, count_stabilizer, count_sphere_renderer, debug_mode)
+        draw_pipeline_result(result, stability_tracker, count_sphere_renderer, debug_mode)
 
         if config.record_video_path is not None and not video_writer_failed:
             if video_writer is None:

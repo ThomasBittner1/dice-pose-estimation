@@ -81,15 +81,12 @@ angles and lighting conditions.
 - The color segmentation pipeline could be improved to adapt automatically to changing lighting conditions 
 instead of requiring manual recalibration.
 
-## Install
+# Install
 
 **1. Install Python packages**
 ```powershell
 pip install -r requirements.txt
 ```
-
-**3. Download Video File**  
-green_cube.mp4
 
 
 ## Run
@@ -97,20 +94,6 @@ green_cube.mp4
 ```powershell
 python run.py
 ```
-
-## Controls
-- `d`: toggle debug mode
-- `q`: quit
-- `Space`: pause/resume
-- Right arrow while paused: step one frame
-- Mouse click a car: isolate that track in the clicked camera; click empty space to clear
-
-Debug-only controls:
-
-- `0`-`9`: number of match candidates to display
-- `M`: toggle inference-ignore mask overlay
-- `O`: toggle query not-from-source mask overlay
-- `,` / `.`: page through source crop gallery
 
 
 ## Use of AI

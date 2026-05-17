@@ -50,7 +50,7 @@ def load_hsv_range(color_name, value_name, fallback):
 class AppConfig:
     video_source: str | int = "green_dice_1.mp4"
     record_video_path: str | None = None
-    start_frame: int = 150
+    start_frame: int = 500
     start_paused: bool = True
     flip_frame_horizontal: bool = False
     stable_similarity_threshold: float = 0.85
@@ -155,7 +155,7 @@ def open_video_writer(record_video_path: str, frame_shape: tuple[int, ...], fps:
 def run_pipeline(
     frame: np.ndarray,
     config: AppConfig,
-    previous_points: np.ndarray | None,
+    previous_mask: np.ndarray | None,
     frame_number: int,
     debug_mode: bool,
 ) -> tuple[PipelineResult, np.ndarray | None]:
@@ -163,8 +163,10 @@ def run_pipeline(
     draw_frame_number(preview, frame_number, debug_mode)
 
     mask, outer_contour, outer_contour_rect = segment_dice(preview, config)
+    similarity_score = geometry_utils.get_similarity_score_mask(mask, previous_mask)
+    next_previous_mask = mask.copy()
     if outer_contour is None or outer_contour_rect is None:
-        return PipelineResult(preview=preview), previous_points
+        return PipelineResult(preview=preview, similarity_score=similarity_score), next_previous_mask
 
     if debug_mode:
         cv2.drawContours(preview, [outer_contour], -1, (255, 255, 255), 1)
@@ -180,10 +182,9 @@ def run_pipeline(
         debug_mode,
     )
     if contour_result is None:
-        return PipelineResult(preview=preview), previous_points
+        return PipelineResult(preview=preview, similarity_score=similarity_score), next_previous_mask
 
-    contour_points, similarity_reference_points = contour_result
-    similarity_score = geometry_utils.get_similarity_score(similarity_reference_points, previous_points)
+    contour_points = contour_result
     top_face_result = estimate_top_face(frame, mask, outer_contour_rect, contour_points, preview, config, debug_mode)
     result = PipelineResult(
         preview=preview,
@@ -199,7 +200,7 @@ def run_pipeline(
         result.top_face_warp = top_face_warp
         result.blurred_mask_preview = blurred_mask_preview
 
-    return result, similarity_reference_points.copy()
+    return result, next_previous_mask
 
 
 def segment_dice(frame: np.ndarray, config: AppConfig) -> tuple[np.ndarray, np.ndarray | None, tuple[int, int, int, int] | None]:
@@ -227,7 +228,7 @@ def extract_contour_geometry(
     frame_number: int,
     config: AppConfig,
     debug_mode: bool,
-) -> tuple[np.ndarray, np.ndarray] | None:
+) -> np.ndarray | None:
     points = geometry_utils.approximate_contour_corners(outer_contour, config.contour_epsilon_ratio)
     points = np.squeeze(points)
     if points.ndim != 2 or len(points) < 3:
@@ -235,11 +236,10 @@ def extract_contour_geometry(
 
     draw_polygon_debug(preview, points, (0, 255, 0), line_thickness=3, text_thickness=2, enabled=debug_mode)
 
-    similarity_reference_points = points.copy()
     points = repair_contour_points(frame, mask, outer_contour_rect, points, frame_number, config, debug_mode)
 
     draw_polygon_debug(preview, points, (0, 0, 255), line_thickness=2, text_thickness=1, enabled=debug_mode)
-    return points, similarity_reference_points
+    return points
 
 
 def repair_contour_points(
@@ -740,7 +740,7 @@ def main(config: AppConfig | None = None):
     paused_frame = None
     redraw_paused_frame = False
     frame_number = config.start_frame - 1
-    previous_points = None
+    previous_mask = None
     stability_tracker = StabilityTracker(
         threshold=config.stable_similarity_threshold,
         required_stable_frames=config.count_sphere_required_count_frames,
@@ -798,20 +798,9 @@ def main(config: AppConfig | None = None):
 
         current_frame = frame.copy()
 
-        result, previous_points = run_pipeline(
-            frame,
-            config,
-            previous_points,
-            frame_number,
-            debug_mode,
-        )
-        draw_pipeline_result(
-            result,
-            stability_tracker,
-            count_stabilizer,
-            count_sphere_renderer,
-            debug_mode,
-        )
+        result, previous_mask = run_pipeline(frame, config, previous_mask, frame_number, debug_mode)
+        draw_pipeline_result(result, stability_tracker, count_stabilizer, count_sphere_renderer, debug_mode)
+
         if config.record_video_path is not None and not video_writer_failed:
             if video_writer is None:
                 video_writer = open_video_writer(config.record_video_path, result.preview.shape, capture_fps)

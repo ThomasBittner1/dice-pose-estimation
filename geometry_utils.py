@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 
-def get_similarity_score(points, reference_points, penalize_different_count=0.2, penalize_position_difference=1.0):
+def get_similarity_score_points(points, reference_points, penalize_different_count=0.2, penalize_position_difference=1.0):
     points = _as_point_array(points)
     reference_points = _as_point_array(reference_points)
 
@@ -23,6 +23,27 @@ def get_similarity_score(points, reference_points, penalize_different_count=0.2,
     position_score = max(0.0, 1.0 - normalized_position_difference * penalize_position_difference)
 
     return min(1.0, count_score * position_score)
+
+
+def get_similarity_score_mask(mask, reference_mask):
+    if mask is None and reference_mask is None:
+        return 1.0
+    if mask is None or reference_mask is None:
+        return 0.0
+
+    mask = np.asarray(mask) > 0
+    reference_mask = np.asarray(reference_mask) > 0
+    if mask.shape != reference_mask.shape:
+        return 0.0
+
+    mask_area = np.count_nonzero(mask)
+    reference_mask_area = np.count_nonzero(reference_mask)
+    larger_area = max(mask_area, reference_mask_area)
+    if larger_area == 0:
+        return 1.0
+
+    smaller_area = min(mask_area, reference_mask_area)
+    return float(smaller_area / larger_area)
 
 
 def _as_point_array(points):

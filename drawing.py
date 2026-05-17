@@ -2,7 +2,7 @@ import cv2
 
 
 class CountSphereRenderer:
-    def __init__(self, required_count_frames=1, fade_speed=0.35, position_blend=0.2):
+    def __init__(self, required_count_frames=1, fade_speed=0.55, position_blend=0.2):
         self.required_count_frames = required_count_frames
         self.fade_speed = fade_speed
         self.position_blend = position_blend
@@ -28,6 +28,7 @@ class CountSphereRenderer:
         return self.count
 
     def update_and_draw(self, image, count, text_origin, is_stable):
+
         visible_count = self.get_visible_count(count)
 
         if text_origin is not None and visible_count is not None:
@@ -44,6 +45,7 @@ class CountSphereRenderer:
         self.opacity += (target_opacity - self.opacity) * self.fade_speed
 
         if self.opacity <= 0.01 or self.center is None or visible_count is None:
+            self.pending_count_frames = self.required_count_frames
             return
 
         _draw_count_sphere_at_center(image, visible_count, self.center, self.opacity)

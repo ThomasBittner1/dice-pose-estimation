@@ -50,7 +50,7 @@ def load_hsv_range(color_name, value_name, fallback):
 class AppConfig:
     video_source: str | int = "green_dice_1.mp4"
     record_video_path: str | None = None
-    start_frame: int = 0 #550
+    start_frame: int = 0
     start_paused: bool = True
     flip_frame_horizontal: bool = False
     stable_similarity_threshold: float = 0.85
@@ -591,7 +591,7 @@ def detect_pips(top_face_warp: np.ndarray, config: AppConfig, debug_mode: bool) 
     )
 
     if circles is None:
-        return 0, blurred_mask_preview
+        return None, blurred_mask_preview
 
     rounded_circles = np.round(circles[0]).astype(int)
     if debug_mode:

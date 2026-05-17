@@ -48,9 +48,9 @@ def load_hsv_range(color_name, value_name, fallback):
 
 @dataclass
 class AppConfig:
-    video_source: str | int = "green_dice_0.mp4"
-    playback_delay_ms: int = 20
-    start_frame: int = 0
+    video_source: str | int = "green_dice_1.mp4"
+    record_video_path: str | None = None
+    start_frame: int = 150
     start_paused: bool = True
     flip_frame_horizontal: bool = False
     stable_similarity_threshold: float = 0.85
@@ -139,6 +139,17 @@ def close_debug_windows():
             cv2.destroyWindow(window_name)
         except cv2.error:
             pass
+
+
+def open_video_writer(record_video_path: str, frame_shape: tuple[int, ...], fps: float) -> cv2.VideoWriter | None:
+    frame_height, frame_width = frame_shape[:2]
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    video_writer = cv2.VideoWriter(record_video_path, fourcc, fps, (frame_width, frame_height))
+    if not video_writer.isOpened():
+        print(f"Warning: Could not open video writer for {record_video_path}. Recording disabled.")
+        return None
+
+    return video_writer
 
 
 def run_pipeline(
@@ -723,6 +734,10 @@ def main(config: AppConfig | None = None):
     if config.start_frame > 0:
         capture.set(cv2.CAP_PROP_POS_FRAMES, config.start_frame)
 
+    capture_fps = capture.get(cv2.CAP_PROP_FPS)
+    if capture_fps <= 0:
+        capture_fps = 30.0
+    playback_delay_ms = max(1, int(round(1000 / capture_fps)))
     paused = config.start_paused
     paused_frame = None
     redraw_paused_frame = False
@@ -736,10 +751,12 @@ def main(config: AppConfig | None = None):
     count_stabilizer = CountStabilizer(config.count_sphere_required_count_frames)
     count_sphere_renderer = drawing.CountSphereRenderer()
     current_frame = None
+    video_writer = None
+    video_writer_failed = False
 
     while True:
         if paused and paused_frame is not None and not redraw_paused_frame:
-            key = cv2.waitKeyEx(config.playback_delay_ms)
+            key = cv2.waitKeyEx(playback_delay_ms)
             if key in QUIT_KEYS:
                 break
             if key == SPACE_KEY:
@@ -797,9 +814,15 @@ def main(config: AppConfig | None = None):
             count_sphere_renderer,
             debug_mode,
         )
+        if config.record_video_path is not None and not video_writer_failed:
+            if video_writer is None:
+                video_writer = open_video_writer(config.record_video_path, result.preview.shape, capture_fps)
+                video_writer_failed = video_writer is None
+            if video_writer is not None:
+                video_writer.write(result.preview)
         show_windows(result, debug_mode)
 
-        key = cv2.waitKeyEx(config.playback_delay_ms)
+        key = cv2.waitKeyEx(playback_delay_ms)
         if key in QUIT_KEYS:
             break
         if key == SPACE_KEY:
@@ -820,6 +843,8 @@ def main(config: AppConfig | None = None):
             paused_frame = None
 
     capture.release()
+    if video_writer is not None:
+        video_writer.release()
     cv2.destroyAllWindows()
 
 

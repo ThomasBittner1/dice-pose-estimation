@@ -102,4 +102,4 @@ AI-assisted development tools (primarily Codex) were used throughout the project
 refactoring, and boilerplate generation.
 
 Core algorithmic design, system integration, and debugging were performed mostly manually. 
-Some utility modules, geometry helpers, and visualization code were heavily AI-assisted and subsequently reviewed/modified.
+Some utility modules, geometry helpers, visualization code and setup files were heavily AI-assisted and subsequently reviewed/modified.

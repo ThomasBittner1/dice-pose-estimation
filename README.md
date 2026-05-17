@@ -27,9 +27,14 @@ Estimates the top face of the dice and counts its dots.
    
 
 # Debug Mode
-- description of what the debug mode does - 
+Debug mode shows the intermediate geometry and masks used by the pipeline:
+- current frame number, tracking state, and contour similarity score
+- detected dice contour and approximated/repaired corner points
+- selected top-face outline and intersection point
+- separate windows for the cropped edge/Hough-line view, warped top face, and blurred dot mask
 
-# Try on Different Cube or Different environment
+
+# How to use it on a dice with different colors
 Currently things are setup for that specific green dice. If you want to run it on a different dice or a different lighting
 setup, run
 ``` batch

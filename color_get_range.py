@@ -19,6 +19,7 @@ class AppConfig:
     video_source: str | int = "green_cube_2.mp4"
     start_frame: int = 6
     start_paused: bool = True
+    flip_frame_horizontal: bool = False
 
 
 def get_default_config():
@@ -436,7 +437,7 @@ def main(config: AppConfig | None = None):
     timer = QtCore.QTimer()
     last_captured_frame = None
 
-    def display_webcam_frame():
+    def display_video_frame():
         nonlocal last_captured_frame
 
         if not controls_dialog.isVisible():
@@ -448,13 +449,14 @@ def main(config: AppConfig | None = None):
         else:
             ret, frame = cap.read()
             if not ret:
-                print("Error: Failed to read frame from webcam.")
+                print("Error: Failed to read frame from video source.")
                 timer.stop()
                 cap.release()
                 controls_dialog.close()
                 return
 
-            cv2.flip(frame, 1, frame)
+            if config.flip_frame_horizontal:
+                cv2.flip(frame, 1, frame)
             last_captured_frame = frame.copy()
 
         if last_captured_frame is None:
@@ -501,7 +503,7 @@ def main(config: AppConfig | None = None):
         combined_preview = np.vstack([top_row, bottom_row])
         controls_dialog.update_video_frame(combined_preview, hsv, source_frame_size=(frame.shape[1], frame.shape[0]))
 
-    timer.timeout.connect(display_webcam_frame)
+    timer.timeout.connect(display_video_frame)
     timer.start(30)
 
     app.exec()

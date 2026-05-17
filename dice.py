@@ -23,7 +23,7 @@ class AppConfig:
     playback_delay_ms: int = 20
     start_frame: int = 0
     start_paused: bool = True
-    flip_frame_horizontal: bool = True
+    flip_frame_horizontal: bool = False
     stable_similarity_threshold: float = 0.85
     dice_hsv_min: tuple[int, int, int] = (26, 59, 30)
     dice_hsv_max: tuple[int, int, int] = (98, 255, 250)

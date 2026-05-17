@@ -81,6 +81,7 @@ def detect_hough_lines_in_contour_roi(
     hough_directions = hough_lines_points[:, 2:4] - hough_lines_points[:, 0:2]
     hough_lines_lengths = np.linalg.norm(hough_directions, axis=1)
     valid_line_mask = hough_lines_lengths > 1e-6
+    hough_lines = hough_lines[valid_line_mask]
     hough_directions = hough_directions[valid_line_mask]
     hough_lines_lengths = hough_lines_lengths[valid_line_mask]
     if len(hough_directions) > 0:

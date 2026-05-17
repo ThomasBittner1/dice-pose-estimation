@@ -23,7 +23,6 @@ class AppConfig:
     playback_delay_ms: int = 20
     start_frame: int = 0
     start_paused: bool = True
-    debug_mode: bool = False
     flip_frame_horizontal: bool = True
     stable_similarity_threshold: float = 0.85
     dice_hsv_min: tuple[int, int, int] = (26, 59, 30)
@@ -678,7 +677,7 @@ def main(config: AppConfig | None = None):
     if config is None:
         config = AppConfig()
 
-    debug_mode = config.debug_mode
+    debug_mode = False
     capture = cv2.VideoCapture(config.video_source)
     if not capture.isOpened():
         print(f"Error: Could not open video source {config.video_source}.")

@@ -6,9 +6,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-import drawing
-import geometry_utils
-from hough_utils import detect_hough_lines_in_contour_roi
+from src import drawing, geometry_utils
+from src.hough_utils import detect_hough_lines_in_contour_roi
 from tracking_state import StabilityTracker
 
 
@@ -499,13 +498,13 @@ def estimate_cross_point(points: np.ndarray, point_indices: np.ndarray) -> tuple
 
 def top_face_triangle_is_collinear(cropped_points: np.ndarray, point_indices: np.ndarray) -> bool:
     return (
-        geometry_utils.points_are_collinear(
+            geometry_utils.points_are_collinear(
             cropped_points[point_indices[0]],
             cropped_points[point_indices[1]],
             cropped_points[point_indices[2]],
             threshold_distance_ratio=0.2,
         )
-        and geometry_utils.points_are_collinear(
+            and geometry_utils.points_are_collinear(
             cropped_points[point_indices[2]],
             cropped_points[point_indices[3]],
             cropped_points[point_indices[4]],

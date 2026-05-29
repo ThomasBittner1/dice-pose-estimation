@@ -1,7 +1,7 @@
 # Dice Pose Estimation and Dot Counting
 
 Estimates the top face of the dice and counts its dots.  
-![Alt text](short_video.gif)  
+![Alt text](docs/images/short_video.gif)  
 Click [here](https://youtu.be/X2E6Y16pKWw) to see a longer and larger version on YouTube:
 
 
@@ -34,7 +34,7 @@ Debug mode shows the intermediate geometry and masks used by the pipeline:
 - detected dice contour and approximated/repaired corner points
 - selected top-face outline and intersection point
 - separate windows for the cropped edge/Hough-line view, warped top face, and blurred dot mask
-![Alt text](debug_mode.jpg)  
+![Alt text](docs/images/debug_mode.jpg)  
 
 
 
@@ -42,10 +42,10 @@ Debug mode shows the intermediate geometry and masks used by the pipeline:
 Currently things are setup for that specific green dice. If you want to run it on a different dice or a different lighting
 setup, run
 ``` batch
-python setup_calibrate_colors.py
+python setup/calibrate_colors.py
 ```
 This opens the following UI:  
-![Alt text](calibrate_colors.jpg)  
+![Alt text](docs/images/calibrate_colors.jpg)  
 It makes you choose 2 colors. Both colors are main color of the dice (green in this case), but in the upper part 
 (*dice_body_contour*), focus on getting a nice contour, he'll need that to estimate the geometry.  
 In the lower part (*dice_face_color*) adjust the sliders so the dots on the top face have strong black contours. This

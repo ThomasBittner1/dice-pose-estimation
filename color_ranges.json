@@ -1,0 +1,28 @@
+{
+  "dice_body_contour": {
+    "min_vals": [
+      26,
+      59,
+      30
+    ],
+    "max_vals": [
+      98,
+      255,
+      250
+    ],
+    "invert": false
+  },
+  "dice_face_color": {
+    "min_vals": [
+      62,
+      37,
+      92
+    ],
+    "max_vals": [
+      89,
+      255,
+      249
+    ],
+    "invert": false
+  }
+}

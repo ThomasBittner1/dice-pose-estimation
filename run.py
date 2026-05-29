@@ -47,7 +47,7 @@ def load_hsv_range(color_name, value_name, fallback):
 
 @dataclass
 class AppConfig:
-    video_source: str | int = "green_dice.mp4"
+    video_source: str | int = "input_videos/green_dice.mp4"
     record_video_path: str | None = None
     start_frame: int = 0
     start_paused: bool = True

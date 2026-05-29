@@ -10,7 +10,7 @@ from PySide6 import QtCore
 from PySide6 import QtGui
 from PySide6 import QtWidgets
 
-COLOR_RANGES_PATH = Path(__file__).with_name("color_ranges.json")
+COLOR_RANGES_PATH = Path(__file__).resolve().parent.parent / "color_ranges.json"
 DICE_BODY_CONTOUR_COLOR_NAME = "dice_body_contour"
 DICE_FACE_COLOR_NAME = "dice_face_color"
 DEFAULT_COLOR_CONFIG = {
@@ -33,7 +33,7 @@ DISPLAY_COLORS = {
 
 @dataclass
 class AppConfig:
-    video_source: str | int = "green_dice.mp4"
+    video_source: str | int = "input_videos/green_dice.mp4"
     start_frame: int = 6
     start_paused: bool = True
     flip_frame_horizontal: bool = False

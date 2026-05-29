@@ -8,7 +8,7 @@ import numpy as np
 
 from src import drawing, geometry_utils
 from src.hough_utils import detect_hough_lines_in_contour_roi
-from tracking_state import StabilityTracker
+from src.tracking_state import StabilityTracker
 
 
 QUIT_KEYS = (ord("q"), ord("Q"))

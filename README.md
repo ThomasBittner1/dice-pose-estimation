@@ -2,7 +2,7 @@
 
 Estimates the top face of the dice and counts its dots.  
 ![Alt text](docs/images/short_video.gif)  
-Click [here](https://youtu.be/X2E6Y16pKWw) to see a longer and larger version on YouTube:
+Click <a href="https://youtu.be/X2E6Y16pKWw" target="_blank" rel="noopener noreferrer">here</a> to see a longer and larger version on YouTube:
 
 
 # Algorithm
